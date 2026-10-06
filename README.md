@@ -1,4 +1,4 @@
-# Team Planner
+# planner-v1
 
 A responsive, shared day/week planner inspired by familiar calendar conventions. Members can
 see the team's schedules and manage their own plans; admins can manage all plans and categories.
