@@ -26,7 +26,7 @@ import {
   X,
 } from "lucide-react";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
@@ -176,6 +176,7 @@ export default function Home() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#4285F4");
   const [categoryBusy, setCategoryBusy] = useState(false);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const visibleDays = useMemo(() => {
     if (view === "day") return [selectedDate];
@@ -200,11 +201,18 @@ export default function Home() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      const nextUserId = nextSession?.user.id ?? null;
+      if (currentUserIdRef.current !== nextUserId) {
+        currentUserIdRef.current = nextUserId;
+        setProfile(null);
+        setProfiles([]);
+        setCategories([]);
+        setPlans([]);
+        setVisibleCategoryIds(null);
+        setPageError("");
+        setDataLoading(true);
+      }
       setSession(nextSession);
-      setProfile(null);
-      setProfiles([]);
-      setCategories([]);
-      setPlans([]);
     });
 
     return () => {
