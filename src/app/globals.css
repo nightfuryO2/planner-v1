@@ -698,6 +698,16 @@ textarea:focus-visible {
   line-height: 1.5;
 }
 
+.calendar-state p.calendar-state-error {
+  padding: 10px 12px;
+  border: 1px solid #f4c7c3;
+  border-radius: 8px;
+  color: #b3261e;
+  background: #fce8e6;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .mobile-create {
   display: none;
 }

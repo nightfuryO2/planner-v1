@@ -644,7 +644,11 @@ export default function Home() {
           {profile === null && !dataLoading ? (
             <div className="calendar-state">
               <h2>Setting up your profile</h2>
-              <p>If this continues, confirm the Supabase database migration has been run.</p>
+              {pageError ? (
+                <p className="calendar-state-error" role="alert">{pageError}</p>
+              ) : (
+                <p>If this continues, confirm the Supabase database migration has been run.</p>
+              )}
               <button className="button button-outline" onClick={() => {
                 if (supabase) void refreshPlanner(supabase, session.user.id);
               }}>Try again</button>
