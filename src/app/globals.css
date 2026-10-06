@@ -1,14 +1,14 @@
 :root {
   color-scheme: light;
-  --ink: #202124;
-  --muted: #70757a;
-  --line: #dadce0;
+  --ink: #18243a;
+  --muted: #66738a;
+  --line: #e0e6ef;
   --surface: #fff;
-  --canvas: #f8fafd;
-  --blue: #1a73e8;
-  --blue-dark: #1765cc;
+  --canvas: #f2f5fa;
+  --blue: #3867f4;
+  --blue-dark: #294fd0;
   --hour-height: 64px;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Inter, "Segoe UI", Arial, Helvetica, sans-serif;
   color: var(--ink);
   background: var(--canvas);
   font-synthesis: none;
@@ -46,17 +46,23 @@ textarea:focus-visible {
 
 .planner-app {
   min-height: 100vh;
-  background: var(--surface);
+  background: var(--canvas);
 }
 
 .topbar {
-  height: 72px;
+  position: relative;
+  z-index: 5;
+  height: 76px;
   display: flex;
   align-items: center;
   gap: 34px;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  padding: 0 28px;
+  border-bottom: 1px solid #263855;
+  color: #f7f9ff;
+  background:
+    radial-gradient(ellipse at 14% -55%, #4e79ff55, transparent 42%),
+    linear-gradient(105deg, #172640, #1d2e4b 58%, #192944);
+  box-shadow: 0 5px 18px #1323421c;
 }
 
 .topbar-brand,
@@ -64,10 +70,10 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 11px;
-  color: #5f6368;
-  font-size: 20px;
-  font-weight: 500;
-  letter-spacing: -0.45px;
+  color: #f6f8ff;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.55px;
   white-space: nowrap;
 }
 
@@ -77,9 +83,11 @@ textarea:focus-visible {
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  border-radius: 11px;
-  background: #e8f0fe;
-  color: var(--blue);
+  border: 1px solid #ffffff26;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #597cff, #315be4);
+  color: #fff;
+  box-shadow: 0 5px 12px #0b173d50;
 }
 
 .topbar-controls,
@@ -99,15 +107,16 @@ textarea:focus-visible {
 .calendar-title {
   margin: 0 0 0 10px;
   overflow: hidden;
-  color: #3c4043;
-  font-size: 20px;
-  font-weight: 400;
+  color: #f6f8ff;
+  font-size: 19px;
+  font-weight: 550;
+  letter-spacing: -0.25px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .topbar-actions {
-  gap: 20px;
+  gap: 14px;
 }
 
 .button {
@@ -156,8 +165,29 @@ textarea:focus-visible {
   font-weight: 500;
 }
 
+.topbar .today-button {
+  min-height: 36px;
+  border-color: #ffffff35;
+  color: #f5f7ff;
+  background: #ffffff0d;
+}
+
+.topbar .today-button:hover {
+  border-color: #ffffff68;
+  background: #ffffff19;
+}
+
 .date-arrows {
   gap: 1px;
+}
+
+.topbar .icon-button {
+  color: #dbe5fa;
+}
+
+.topbar .icon-button:hover {
+  color: #fff;
+  background: #ffffff19;
 }
 
 .icon-button {
@@ -192,9 +222,9 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid #ffffff2a;
+  border-radius: 9px;
+  background: #101d33aa;
 }
 
 .view-switch button {
@@ -203,15 +233,16 @@ textarea:focus-visible {
   padding: 0 10px;
   border: 0;
   border-radius: 5px;
-  color: #5f6368;
+  color: #d0d9eb;
   background: transparent;
   font-size: 13px;
   cursor: pointer;
 }
 
 .view-switch button.selected {
-  color: #174ea6;
-  background: #e8f0fe;
+  color: #fff;
+  background: #3867f4;
+  box-shadow: 0 2px 8px #0d1a39aa;
   font-weight: 600;
 }
 
@@ -227,8 +258,9 @@ textarea:focus-visible {
   place-items: center;
   flex: 0 0 auto;
   border-radius: 50%;
-  color: #174ea6;
-  background: #d2e3fc;
+  border: 1px solid #ffffff55;
+  color: #fff;
+  background: linear-gradient(145deg, #f29b67, #d96d69);
   font-size: 14px;
   font-weight: 700;
 }
@@ -236,7 +268,7 @@ textarea:focus-visible {
 .user-name {
   max-width: 135px;
   overflow: hidden;
-  color: #3c4043;
+  color: #edf2fc;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -245,8 +277,8 @@ textarea:focus-visible {
 .role-pill {
   padding: 4px 7px;
   border-radius: 999px;
-  color: #174ea6;
-  background: #e8f0fe;
+  color: #cfdaff;
+  background: #ffffff18;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -257,39 +289,46 @@ textarea:focus-visible {
 }
 
 .planner-body {
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 76px);
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: 258px minmax(0, 1fr);
+  gap: 0;
 }
 
 .sidebar {
-  padding: 24px 15px 20px 19px;
-  border-right: 1px solid var(--line);
-  background: #fff;
+  padding: 24px 17px 20px 21px;
+  border-right: 1px solid #e3e8f0;
+  background:
+    linear-gradient(180deg, #f6f8fc 0%, #f3f6fb 68%, #f7f8fc 100%);
 }
 
 .button-create {
-  min-height: 48px;
-  padding: 0 18px;
-  border-radius: 24px;
-  color: #3c4043;
-  background: #fff;
-  box-shadow: 0 1px 2px #0002, 0 1px 3px #0001;
+  min-height: 50px;
+  padding: 0 20px;
+  border-radius: 14px;
+  color: #fff;
+  background: linear-gradient(110deg, #426bf4, #3159dc);
+  box-shadow: 0 7px 16px #3159dc3b, inset 0 1px #ffffff30;
   font-size: 14px;
   font-weight: 600;
 }
 
 .button-create svg {
-  color: var(--blue);
+  color: #fff;
 }
 
 .button-create:hover {
-  background: #f8fafd;
-  box-shadow: 0 2px 5px #0003;
+  background: linear-gradient(110deg, #3159dc, #294bc0);
+  box-shadow: 0 9px 20px #3159dc48;
 }
 
 .mini-calendar {
-  margin: 27px 4px 27px 1px;
+  margin: 24px 0 22px;
+  padding: 15px 12px 12px;
+  border: 1px solid #e4e9f2;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 4px 13px #25395b08;
 }
 
 .mini-calendar-head,
@@ -366,20 +405,27 @@ textarea:focus-visible {
 }
 
 .sidebar-section {
-  padding-top: 18px;
-  border-top: 1px solid #e8eaed;
+  padding: 17px 11px 0;
+  border-top: 1px solid #dfe5ef;
 }
 
 .sidebar-heading {
-  margin-bottom: 12px;
-  padding: 0 3px;
+  margin-bottom: 9px;
+  padding: 0;
 }
 
 .sidebar-heading h2 {
   margin: 0;
-  color: #3c4043;
+  color: #24324b;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+}
+
+.sidebar-heading p {
+  margin: 4px 0 0;
+  color: #8390a5;
+  font-size: 10px;
 }
 
 .category-list {
@@ -392,10 +438,17 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 3px;
-  color: #3c4043;
+  padding: 0 7px;
+  border-radius: 8px;
+  color: #3b4a62;
   font-size: 13px;
   cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.category-filter:hover {
+  color: #203250;
+  background: #e9eef8;
 }
 
 .category-filter input,
@@ -414,10 +467,11 @@ textarea:focus-visible {
 }
 
 .category-dot {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   flex: 0 0 auto;
-  border-radius: 3px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px #00000012;
 }
 
 .sidebar-empty {
@@ -430,36 +484,57 @@ textarea:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  margin-top: 30px;
-  padding: 11px 9px;
-  border-radius: 8px;
-  color: #5f6368;
-  background: #f8fafd;
+  margin: 23px 3px 0;
+  padding: 12px 11px;
+  border: 1px solid #dce5fa;
+  border-radius: 11px;
+  color: #455570;
+  background: linear-gradient(135deg, #edf2ff, #f7f8ff);
 }
 
 .tip-icon {
-  color: var(--blue);
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--blue);
+}
+
+.sidebar-tip strong {
+  display: block;
+  margin: 1px 0 3px;
+  color: #2f4266;
+  font-size: 11px;
 }
 
 .sidebar-tip p {
-  margin: 1px 0 0;
-  font-size: 11px;
+  margin: 0;
+  color: #687895;
+  font-size: 10px;
   line-height: 1.45;
 }
 
 .calendar-panel {
   position: relative;
   min-width: 0;
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 108px);
+  margin: 16px 18px 16px 16px;
+  border: 1px solid #e0e6ef;
+  border-radius: 17px;
   overflow: hidden;
   background: #fff;
+  box-shadow: 0 7px 22px #1b31500b;
 }
 
 .calendar-scroll {
   position: absolute;
   inset: 0;
   overflow: auto;
-  scrollbar-color: #dadce0 transparent;
+  border-radius: inherit;
+  scrollbar-color: #c5cedc transparent;
   scrollbar-width: thin;
 }
 
@@ -469,7 +544,7 @@ textarea:focus-visible {
 }
 
 .calendar-grid.week-view {
-  min-width: 980px;
+  min-width: 940px;
 }
 
 .calendar-head,
@@ -482,9 +557,9 @@ textarea:focus-visible {
   position: sticky;
   z-index: 4;
   top: 0;
-  min-height: 66px;
-  border-bottom: 1px solid var(--line);
-  background: #fff;
+  min-height: 78px;
+  border-bottom: 1px solid #e2e8f1;
+  background: linear-gradient(180deg, #fff, #fcfdff);
 }
 
 .timezone-head {
@@ -492,7 +567,7 @@ textarea:focus-visible {
   align-items: flex-end;
   justify-content: center;
   padding-bottom: 7px;
-  color: #70757a;
+  color: #8390a5;
   font-size: 9px;
   white-space: nowrap;
 }
@@ -505,13 +580,13 @@ textarea:focus-visible {
   justify-content: center;
   gap: 4px;
   border: 0;
-  border-left: 1px solid #f0f1f2;
+  border-left: 1px solid #edf0f5;
   background: transparent;
   cursor: pointer;
 }
 
 .day-head > span {
-  color: #70757a;
+  color: #72809a;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.35px;
@@ -519,28 +594,29 @@ textarea:focus-visible {
 }
 
 .day-head > b {
-  width: 31px;
-  height: 31px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  color: #3c4043;
+  color: #273650;
   font-size: 18px;
   font-weight: 400;
 }
 
 .day-head:hover {
-  background: #f8fafd;
+  background: #f3f6fc;
 }
 
 .day-head.current-day > span {
-  color: var(--blue);
+  color: #3159dc;
 }
 
 .day-head.current-day > b {
   color: #fff;
-  background: var(--blue);
+  background: linear-gradient(145deg, #4f78ff, #3155df);
   font-weight: 600;
+  box-shadow: 0 4px 10px #3159dc45;
 }
 
 .calendar-grid-body {
@@ -550,14 +626,14 @@ textarea:focus-visible {
 .time-gutter {
   position: relative;
   height: calc(24 * var(--hour-height));
-  background: #fff;
+  background: #fcfdff;
 }
 
 .hour-label {
   position: relative;
   height: var(--hour-height);
   padding: 0 7px 0 0;
-  color: #70757a;
+  color: #8290a6;
   font-size: 10px;
   text-align: right;
   transform: translateY(-6px);
@@ -566,18 +642,18 @@ textarea:focus-visible {
 .day-column {
   position: relative;
   height: calc(24 * var(--hour-height));
-  border-left: 1px solid #e8eaed;
+  border-left: 1px solid #e9edf3;
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
     transparent calc(var(--hour-height) - 1px),
-    #e8eaed calc(var(--hour-height) - 1px),
-    #e8eaed var(--hour-height)
+    #e3e8f0 calc(var(--hour-height) - 1px),
+    #e3e8f0 var(--hour-height)
   );
 }
 
 .day-column.current-day-column {
-  background-color: #f8fbff;
+  background-color: #f7f9ff;
 }
 
 .hour-cell {
@@ -593,7 +669,7 @@ textarea:focus-visible {
 }
 
 .hour-cell:hover {
-  background: #4285f40a;
+  background: #3867f414;
 }
 
 .plan-block {
@@ -603,12 +679,13 @@ textarea:focus-visible {
   flex-direction: column;
   align-items: flex-start;
   overflow: hidden;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border: 0;
-  border-left: 3px solid;
-  border-radius: 4px;
+  border-left: 4px solid;
+  border-radius: 7px;
   text-align: left;
   cursor: default;
+  box-shadow: 0 2px 5px #263a5910;
 }
 
 .plan-block.interactive {
@@ -618,14 +695,16 @@ textarea:focus-visible {
 .plan-block.interactive:hover {
   z-index: 3;
   filter: saturate(1.15);
-  box-shadow: 0 1px 4px #0002;
+  box-shadow: 0 5px 13px #263a5920;
+  transform: translateY(-1px);
 }
 
 .plan-title {
   width: 100%;
   overflow: hidden;
+  color: #202e45;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 750;
   line-height: 1.35;
   text-overflow: ellipsis;
 }
@@ -635,7 +714,7 @@ textarea:focus-visible {
   width: 100%;
   overflow: hidden;
   margin-top: 2px;
-  color: #3c4043;
+  color: #42516a;
   font-size: 10px;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -799,10 +878,10 @@ textarea:focus-visible {
   width: 100%;
   min-height: 42px;
   padding: 9px 11px;
-  border: 1px solid #dadce0;
+  border: 1px solid #cbd4e2;
   border-radius: 7px;
   color: #202124;
-  background: #fff;
+  background: #fcfdff;
   font-size: 14px;
   font-weight: 400;
 }
@@ -1300,7 +1379,7 @@ textarea:focus-visible {
   }
 
   .planner-body {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 230px minmax(0, 1fr);
   }
 
   .sidebar {
@@ -1352,7 +1431,8 @@ textarea:focus-visible {
   }
 
   .calendar-panel {
-    min-height: calc(100vh - 62px);
+    min-height: calc(100vh - 94px);
+    margin: 14px 12px;
   }
 
   .calendar-grid.week-view {
@@ -1450,13 +1530,14 @@ textarea:focus-visible {
     align-items: center;
     justify-content: space-between;
     padding: 0 9px;
-    border-bottom: 1px solid var(--line);
-    background: #fff;
+    border-bottom: 1px solid #293a58;
+    color: #f5f7ff;
+    background: #1a2a45;
   }
 
   .mobile-date-bar strong {
     overflow: hidden;
-    color: #3c4043;
+    color: #f5f7ff;
     font-size: 14px;
     font-weight: 500;
     text-overflow: ellipsis;
@@ -1468,15 +1549,24 @@ textarea:focus-visible {
     padding: 5px 6px;
     border: 0;
     border-radius: 5px;
-    color: var(--blue);
-    background: transparent;
+    color: #dce5ff;
+    background: #ffffff12;
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
   }
 
   .mobile-today:hover {
-    background: #e8f0fe;
+    background: #ffffff21;
+  }
+
+  .mobile-date-bar .icon-button {
+    color: #dbe5fa;
+  }
+
+  .mobile-date-bar .icon-button:hover {
+    color: #fff;
+    background: #ffffff17;
   }
 
   .planner-body {
@@ -1488,7 +1578,8 @@ textarea:focus-visible {
     display: block;
     padding: 10px 12px 9px;
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid #e1e7f0;
+    background: #f4f6fb;
   }
 
   .sidebar > .button-create,
@@ -1511,6 +1602,10 @@ textarea:focus-visible {
     font-size: 11px;
   }
 
+  .sidebar-heading p {
+    display: none;
+  }
+
   .category-list {
     display: flex;
     gap: 7px;
@@ -1528,8 +1623,9 @@ textarea:focus-visible {
     flex: 0 0 auto;
     gap: 5px;
     padding: 0 8px;
-    border: 1px solid #e8eaed;
-    border-radius: 15px;
+    border: 1px solid #dce3ee;
+    border-radius: 10px;
+    background: #fff;
     font-size: 11px;
     white-space: nowrap;
   }
@@ -1545,8 +1641,10 @@ textarea:focus-visible {
   }
 
   .calendar-panel {
-    min-height: calc(100vh - 192px);
-    height: calc(100vh - 192px);
+    min-height: calc(100dvh - 214px);
+    height: calc(100dvh - 214px);
+    margin: 10px 8px 70px;
+    border-radius: 14px;
   }
 
   .calendar-grid {
@@ -1554,7 +1652,7 @@ textarea:focus-visible {
   }
 
   .calendar-grid.week-view {
-    min-width: 760px;
+    min-width: 700px;
   }
 
   .calendar-head,
@@ -1563,7 +1661,7 @@ textarea:focus-visible {
   }
 
   .calendar-head {
-    min-height: 59px;
+    min-height: 64px;
   }
 
   .timezone-head {
@@ -1611,8 +1709,8 @@ textarea:focus-visible {
     min-height: 48px;
     padding: 0 17px;
     color: #fff;
-    background: #1a73e8;
-    box-shadow: 0 2px 9px #174ea633;
+    background: linear-gradient(110deg, #426bf4, #3159dc);
+    box-shadow: 0 6px 18px #193aab55;
   }
 
   .mobile-create .button-create svg {

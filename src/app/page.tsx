@@ -18,7 +18,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Clock3,
   LogOut,
   Plus,
   RefreshCw,
@@ -611,7 +610,10 @@ export default function Home() {
           </div>
           <div className="sidebar-section">
             <div className="sidebar-heading">
-              <h2>My calendars</h2>
+              <div>
+                <h2>Plan categories</h2>
+                <p>Filter the team schedule</p>
+              </div>
               {isAdmin && <button className="icon-button small-icon" aria-label="Manage categories" title="Manage categories" onClick={() => setCategoryManagerOpen(true)}><Settings2 size={16} /></button>}
             </div>
             <div className="category-list">
@@ -630,8 +632,11 @@ export default function Home() {
             </div>
           </div>
           <div className="sidebar-tip">
-            <span className="tip-icon"><Clock3 size={16} /></span>
-            <p>Plans are shown in your local time.</p>
+            <span className="tip-icon"><Plus size={16} /></span>
+            <div>
+              <strong>Quick add</strong>
+              <p>Select any time slot to start a plan.</p>
+            </div>
           </div>
         </aside>
 
@@ -714,7 +719,7 @@ export default function Home() {
                                 height: `${height}px`,
                                 left: `calc(${plan.left}% + 2px)`,
                                 width: `calc(${plan.width}% - 4px)`,
-                                backgroundColor: category ? `${category.color}20` : "#e8eaed",
+                                backgroundColor: category ? `${category.color}32` : "#e8eaed",
                                 borderLeftColor: category?.color ?? "#9aa0a6",
                                 color: "#202124",
                               }}
