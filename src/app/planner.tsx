@@ -18,6 +18,7 @@ import {
   CalendarCheck2,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   LogOut,
   MapPin,
   Plus,
@@ -54,6 +55,12 @@ type PlanDraft = {
   created_by?: string;
   readOnly?: boolean;
   ownerName?: string;
+};
+
+type PlanHoverCard = {
+  plan: Plan;
+  top: number;
+  left: number;
 };
 
 function formatTime(value: string) {
@@ -185,6 +192,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [view, setView] = useState<"day" | "week">("week");
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
+  const [planHoverCard, setPlanHoverCard] = useState<PlanHoverCard | null>(null);
   const [testProfileId, setTestProfileId] = useState("");
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -210,6 +218,21 @@ export default function Home() {
   const isPreviewMode = Boolean(isAdmin && testProfile);
   const activeProfile = isPreviewMode ? testProfile : profile;
   const canManage = Boolean(isAdmin && !isPreviewMode);
+
+  function showPlanHoverCard(plan: Plan, target: HTMLButtonElement) {
+    const rect = target.getBoundingClientRect();
+    const cardWidth = Math.min(320, window.innerWidth - 24);
+    const cardHeight = 240;
+    const left = Math.max(
+      12,
+      Math.min(rect.left, window.innerWidth - cardWidth - 12),
+    );
+    const below = rect.bottom + 10;
+    const top = below + cardHeight <= window.innerHeight - 12
+      ? below
+      : Math.max(12, rect.top - cardHeight - 10);
+    setPlanHoverCard({ plan, top, left });
+  }
 
   useEffect(() => {
     if (!supabase) return;
@@ -411,6 +434,7 @@ export default function Home() {
   }
 
   function openExistingPlan(plan: Plan) {
+    setPlanHoverCard(null);
     const canEdit = canManage || plan.created_by === activeProfile?.id;
     setSelectedDate(new Date(`${plan.plan_date}T00:00:00`));
     setPlanDraft({
@@ -974,9 +998,11 @@ export default function Home() {
                           const end = timeToMinutes(plan.end_time);
                           const top = (start / 60) * HOUR_HEIGHT;
                           const height = Math.max(((end - start) / 60) * HOUR_HEIGHT, 28);
+                          const categoryName = plan.custom_category || category?.name || "Category";
+                          const ownerName = ownPlan ? "You" : owner?.display_name ?? "Team member";
                           return (
                             <button
-                              className="plan-block interactive"
+                              className={`plan-block interactive${height < 58 ? " compact" : ""}${height < 40 ? " tiny" : ""}`}
                               key={plan.id}
                               style={{
                                 top: `${top}px`,
@@ -988,12 +1014,25 @@ export default function Home() {
                                 color: "#202124",
                               }}
                               onClick={() => openExistingPlan(plan)}
-                              title={`${plan.title} · ${formatTime(plan.start_time)}–${formatTime(plan.end_time)} · ${owner?.display_name ?? "Team member"}`}
+                              onMouseEnter={(event) => showPlanHoverCard(plan, event.currentTarget)}
+                              onMouseLeave={() => setPlanHoverCard(null)}
+                              onFocus={(event) => showPlanHoverCard(plan, event.currentTarget)}
+                              onBlur={() => setPlanHoverCard(null)}
+                              aria-label={`${plan.title}, ${categoryName}, ${ownerName}, ${formatTime(plan.start_time)} to ${formatTime(plan.end_time)}`}
+                              aria-describedby={planHoverCard?.plan.id === plan.id ? "plan-hover-card" : undefined}
                             >
                               <span className="plan-title">{plan.title}</span>
                               <span className="plan-time">{formatTime(plan.start_time)} – {formatTime(plan.end_time)}</span>
-                              <span className="plan-owner">{ownPlan ? "You" : owner?.display_name ?? "Team member"} · {plan.custom_category || category?.name || "Category"}</span>
-                              {plan.location && <span className="plan-location"><MapPin size={10} />{plan.location}</span>}
+                              <span className="plan-identifiers">
+                                <span className="plan-owner">
+                                  <span className="plan-owner-initial">{ownerName.slice(0, 1).toUpperCase()}</span>
+                                  <span className="plan-owner-name">{ownerName}</span>
+                                </span>
+                                <span className="plan-category">
+                                  <span className="plan-category-dot" style={{ backgroundColor: category?.color ?? "#9aa0a6" }} />
+                                  <span className="plan-category-name">{categoryName}</span>
+                                </span>
+                              </span>
                             </button>
                           );
                         })}
@@ -1012,6 +1051,47 @@ export default function Home() {
           </>
         )}
       </div>
+
+      {planHoverCard && !planDraft && !categoryManagerOpen && (() => {
+        const plan = planHoverCard.plan;
+        const category = categoryById.get(plan.category_id);
+        const ownerName = plan.created_by === activeProfile?.id
+          ? "You"
+          : profileById.get(plan.created_by)?.display_name ?? "Team member";
+        const canSeeNotes = canManage || plan.created_by === activeProfile?.id;
+
+        return (
+          <div
+            className="plan-hover-card"
+            id="plan-hover-card"
+            role="tooltip"
+            style={{ top: planHoverCard.top, left: planHoverCard.left }}
+          >
+            <div className="plan-hover-heading">
+              <span className="plan-hover-category-dot" style={{ backgroundColor: category?.color ?? "#9aa0a6" }} />
+              <strong>{plan.title}</strong>
+            </div>
+            <span className="plan-hover-category">{plan.custom_category || category?.name || "Category"}</span>
+            <div className="plan-hover-row">
+              <Clock3 size={15} />
+              <span>{format(new Date(`${plan.plan_date}T00:00:00`), "EEE, MMM d")} · {formatTime(plan.start_time)} – {formatTime(plan.end_time)}</span>
+            </div>
+            <div className="plan-hover-row">
+              <span className="plan-hover-avatar">{ownerName.slice(0, 1).toUpperCase()}</span>
+              <span>{ownerName}</span>
+            </div>
+            {plan.location && (
+              <div className="plan-hover-row">
+                <MapPin size={15} />
+                <span>{plan.location}</span>
+              </div>
+            )}
+            {canSeeNotes && plan.details && (
+              <p className="plan-hover-notes">{plan.details}</p>
+            )}
+          </div>
+        );
+      })()}
 
       {planDraft && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {

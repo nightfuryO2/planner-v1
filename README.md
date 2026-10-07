@@ -68,6 +68,7 @@ profile. These are preview profiles, not passwordless authentication accounts.
 - `/` is the planner home; `/team` is the signed-in team directory. BOA users can view names and roles, while admins can also manage user roles.
 - Schedules use the selected day and the browser's local time.
 - Refresh the schedule after another member adds or changes a plan.
+- Overlapping plans are arranged in side-by-side lanes. Calendar cards prioritize the plan name and time, show member/category markers when space is tight, and reveal full visible details on hover or keyboard focus; tapping a plan opens its details on touch devices.
 - Members can create, edit, and delete their own plans; other members' plans are read-only.
 - Other members' plan notes are private; only the owner and admins can read them.
 - Plan locations are visible to the whole team.
