@@ -946,6 +946,12 @@ textarea:focus-visible {
   display: none;
 }
 
+.plan-block.stacked {
+  gap: 2px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
 @container (max-width: 120px) {
   .plan-identifiers {
     grid-template-columns: auto auto;

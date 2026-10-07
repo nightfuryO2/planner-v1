@@ -40,6 +40,8 @@ import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabas
 import type { Category, Plan, PositionedPlan, Profile, TeamUser } from "@/lib/types";
 
 const HOUR_HEIGHT = 64;
+const STACKED_CARD_HEIGHT = 58;
+const STACKED_CARD_GAP = 4;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 type PlanDraft = {
@@ -79,25 +81,39 @@ function getPositionedPlans(plans: Plan[]): PositionedPlan[] {
   const positioned = new Map<string, PositionedPlan>();
   let group: Plan[] = [];
   let groupEnd = "";
+  let verticalCursor = 0;
 
   const placeGroup = () => {
-    const columnEnds: string[] = [];
-    const placements: Array<{ plan: Plan; column: number }> = [];
+    const stacked = group.length > 1;
+    const plannedTop = (timeToMinutes(group[0].start_time) / 60) * HOUR_HEIGHT;
+    const groupTop = Math.max(plannedTop, verticalCursor);
 
-    for (const plan of group) {
-      let column = columnEnds.findIndex((end) => end <= plan.start_time);
-      if (column === -1) column = columnEnds.length;
-      columnEnds[column] = plan.end_time;
-      placements.push({ plan, column });
-    }
-
-    placements.forEach(({ plan, column }) => {
+    group.forEach((plan, index) => {
+      const scheduledHeight = Math.max(
+        ((timeToMinutes(plan.end_time) - timeToMinutes(plan.start_time)) / 60) * HOUR_HEIGHT,
+        28,
+      );
+      const displayHeight = stacked ? STACKED_CARD_HEIGHT : scheduledHeight;
+      const displayTop = stacked
+        ? groupTop + index * (STACKED_CARD_HEIGHT + STACKED_CARD_GAP)
+        : groupTop;
       positioned.set(plan.id, {
         ...plan,
-        left: (column / columnEnds.length) * 100,
-        width: 100 / columnEnds.length,
+        left: 0,
+        width: 100,
+        displayTop,
+        displayHeight,
+        stacked,
       });
     });
+    const groupDisplayHeight = stacked
+      ? group.length * STACKED_CARD_HEIGHT + (group.length - 1) * STACKED_CARD_GAP
+      : Math.max(
+          ((timeToMinutes(group[0].end_time) - timeToMinutes(group[0].start_time)) / 60) * HOUR_HEIGHT,
+          28,
+        );
+    const plannedEnd = Math.max(...group.map((plan) => timeToMinutes(plan.end_time))) / 60 * HOUR_HEIGHT;
+    verticalCursor = Math.max(groupTop + groupDisplayHeight, plannedEnd) + 2;
     group = [];
     groupEnd = "";
   };
@@ -994,15 +1010,13 @@ export default function Home() {
                           const category = categoryById.get(plan.category_id);
                           const owner = profileById.get(plan.created_by);
                           const ownPlan = plan.created_by === activeProfile?.id;
-                          const start = timeToMinutes(plan.start_time);
-                          const end = timeToMinutes(plan.end_time);
-                          const top = (start / 60) * HOUR_HEIGHT;
-                          const height = Math.max(((end - start) / 60) * HOUR_HEIGHT, 28);
+                          const top = plan.displayTop;
+                          const height = plan.displayHeight;
                           const categoryName = plan.custom_category || category?.name || "Category";
                           const ownerName = ownPlan ? "You" : owner?.display_name ?? "Team member";
                           return (
                             <button
-                              className={`plan-block interactive${height < 58 ? " compact" : ""}${height < 40 ? " tiny" : ""}`}
+                              className={`plan-block interactive${plan.stacked ? " stacked" : ""}${height < 58 ? " compact" : ""}${height < 40 ? " tiny" : ""}`}
                               key={plan.id}
                               style={{
                                 top: `${top}px`,
