@@ -892,7 +892,11 @@ export default function Home() {
                 </div>
                 <div className="calendar-grid-body">
                   <div className="time-gutter">
-                    {HOURS.map((hour) => <div className="hour-label" key={hour}>{format(new Date(2020, 0, 1, hour), "h a")}</div>)}
+                    {HOURS.map((hour) => (
+                      <div className={`hour-label${hour === 0 ? " midnight-label" : ""}`} key={hour}>
+                        {format(new Date(2020, 0, 1, hour), "h a")}
+                      </div>
+                    ))}
                   </div>
                   {visibleDays.map((day) => {
                     const dayPlans = getPositionedPlans(

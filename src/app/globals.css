@@ -730,8 +730,10 @@ textarea:focus-visible {
   transform: translateY(-6px);
 }
 
-.hour-label:first-child {
-  padding-top: 4px;
+.hour-label.midnight-label {
+  top: 12px;
+  z-index: 1;
+  padding-top: 0;
   transform: none;
 }
 
