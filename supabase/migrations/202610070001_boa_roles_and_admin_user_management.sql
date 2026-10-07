@@ -32,11 +32,11 @@ begin
 
   return query
   select
-    u.id,
-    coalesce(u.email, ''),
-    p.display_name,
-    p.role,
-    p.created_at
+    u.id::uuid,
+    coalesce(u.email, '')::text,
+    p.display_name::text,
+    p.role::text,
+    p.created_at::timestamptz
   from auth.users as u
   join public.profiles as p on p.id = u.id
   order by p.created_at, p.display_name;
