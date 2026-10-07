@@ -559,6 +559,22 @@ export default function Home() {
     event.preventDefault();
     if (!supabase || !session || !planDraft || planDraft.readOnly) return;
 
+    if (!planDraft.title.trim()) {
+      setPageError("Enter a plan name.");
+      return;
+    }
+    if (!planDraft.category_id) {
+      setPageError("Choose a category.");
+      return;
+    }
+    if (!planDraft.plan_date || !planDraft.start_time || !planDraft.end_time) {
+      setPageError("Choose a date, start time, and end time.");
+      return;
+    }
+    if (!planDraft.location.trim()) {
+      setPageError("Enter a location.");
+      return;
+    }
     if (planDraft.end_time <= planDraft.start_time) {
       setPageError("The end time must be later than the start time.");
       return;
@@ -1432,11 +1448,12 @@ export default function Home() {
                 </div>
               ) : (
                 <label>
-                  Location <span className="optional-label">Optional</span>
+                  Location
                   <input
                     value={planDraft.location}
                     onChange={(event) => setPlanDraft({ ...planDraft, location: event.target.value })}
                     maxLength={120}
+                    required
                     placeholder="Where will you be?"
                   />
                 </label>
