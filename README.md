@@ -50,6 +50,11 @@ To let admins create a plan on behalf of a member, apply
 in the Supabase SQL editor. Admin-created plans are owned by the selected member, who can manage
 that plan like their own.
 
+To allow members to add a custom category on a plan, apply
+[`supabase/migrations/202610070003_other_plan_category.sql`](./supabase/migrations/202610070003_other_plan_category.sql)
+in the Supabase SQL editor. The plan form will then show an **Other** category option and request
+a custom category name.
+
 ## Planner behavior
 
 - Day and Monday-to-Sunday week views, with a date picker and previous/next navigation.

@@ -45,6 +45,7 @@ type PlanDraft = {
   title: string;
   details: string;
   category_id: string;
+  custom_category: string;
   plan_date: string;
   start_time: string;
   end_time: string;
@@ -124,7 +125,7 @@ async function fetchPlannerData(
       client.from("categories").select("id, name, color, active").order("name"),
       client
         .from("team_plans")
-        .select("id, title, details, category_id, plan_date, start_time, end_time, created_by")
+        .select("id, title, details, category_id, custom_category, plan_date, start_time, end_time, created_by")
         .gte("plan_date", rangeStart)
         .lte("plan_date", rangeEnd)
         .order("start_time"),
@@ -391,6 +392,7 @@ export default function Home() {
       title: "",
       details: "",
       category_id: categories.find((category) => category.active)?.id ?? "",
+      custom_category: "",
       plan_date: format(planDate, "yyyy-MM-dd"),
       start_time: start,
       end_time: end,
@@ -406,6 +408,7 @@ export default function Home() {
       title: plan.title,
       details: plan.details ?? "",
       category_id: plan.category_id,
+      custom_category: plan.custom_category ?? "",
       plan_date: plan.plan_date,
       start_time: plan.start_time.slice(0, 5),
       end_time: plan.end_time.slice(0, 5),
@@ -423,11 +426,19 @@ export default function Home() {
       return;
     }
 
+    const selectedCategory = categories.find((category) => category.id === planDraft.category_id);
+    const isOtherCategory = selectedCategory?.name.trim().toLowerCase() === "other";
+    if (isOtherCategory && !planDraft.custom_category.trim()) {
+      setPageError("Enter a name for the other category.");
+      return;
+    }
+
     setPageError("");
     const values = {
       title: planDraft.title.trim(),
       details: planDraft.details.trim() || null,
       category_id: planDraft.category_id,
+      custom_category: isOtherCategory ? planDraft.custom_category.trim() : null,
       plan_date: planDraft.plan_date,
       start_time: planDraft.start_time,
       end_time: planDraft.end_time,
@@ -625,6 +636,8 @@ export default function Home() {
   const isAdmin = profile?.role === "admin";
   const activeCategories = categories.filter((category) => category.active);
   const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const selectedCategory = categoryById.get(planDraft?.category_id ?? "");
+  const isOtherCategory = selectedCategory?.name.trim().toLowerCase() === "other";
   const profileById = new Map(profiles.map((member) => [member.id, member]));
   const filteredTeamUsers = teamUsers.filter((user) => {
     const query = teamUserSearch.trim().toLowerCase();
@@ -945,7 +958,7 @@ export default function Home() {
                             >
                               <span className="plan-title">{plan.title}</span>
                               <span className="plan-time">{formatTime(plan.start_time)} – {formatTime(plan.end_time)}</span>
-                              <span className="plan-owner">{ownPlan ? "You" : owner?.display_name ?? "Team member"} · {category?.name ?? "Category"}</span>
+                              <span className="plan-owner">{ownPlan ? "You" : owner?.display_name ?? "Team member"} · {plan.custom_category || category?.name || "Category"}</span>
                             </button>
                           );
                         })}
@@ -1003,11 +1016,24 @@ export default function Home() {
               </label>
               <label>
                 Category
-                <select value={planDraft.category_id} onChange={(event) => setPlanDraft({ ...planDraft, category_id: event.target.value })} required disabled={planDraft.readOnly}>
+                <select value={planDraft.category_id} onChange={(event) => setPlanDraft({ ...planDraft, category_id: event.target.value, custom_category: "" })} required disabled={planDraft.readOnly}>
                   {categories.filter((category) => category.active || category.id === planDraft.category_id).map((category) => <option value={category.id} key={category.id}>{category.name}{category.active ? "" : " (inactive)"}</option>)}
                 </select>
                 {!planDraft.readOnly && activeCategories.length === 0 && <small>Ask an admin to add an active category.</small>}
               </label>
+              {isOtherCategory && (
+                <label>
+                  Other category
+                  <input
+                    value={planDraft.custom_category}
+                    onChange={(event) => setPlanDraft({ ...planDraft, custom_category: event.target.value })}
+                    maxLength={40}
+                    required
+                    placeholder="e.g. Training"
+                    disabled={planDraft.readOnly}
+                  />
+                </label>
+              )}
               <div className="time-inputs">
                 <label>Start time<input type="time" value={planDraft.start_time} onChange={(event) => setPlanDraft({ ...planDraft, start_time: event.target.value })} required disabled={planDraft.readOnly} /></label>
                 <span className="time-separator">to</span>

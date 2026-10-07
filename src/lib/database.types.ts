@@ -57,6 +57,7 @@ export type Database = {
           title: string;
           details: string | null;
           category_id: string;
+          custom_category: string | null;
           plan_date: string;
           start_time: string;
           end_time: string;
@@ -69,6 +70,7 @@ export type Database = {
           title: string;
           details?: string | null;
           category_id: string;
+          custom_category?: string | null;
           plan_date: string;
           start_time: string;
           end_time: string;
@@ -81,6 +83,7 @@ export type Database = {
           title?: string;
           details?: string | null;
           category_id?: string;
+          custom_category?: string | null;
           plan_date?: string;
           start_time?: string;
           end_time?: string;
@@ -97,6 +100,7 @@ export type Database = {
           title: string;
           details: string | null;
           category_id: string;
+          custom_category: string | null;
           plan_date: string;
           start_time: string;
           end_time: string;
