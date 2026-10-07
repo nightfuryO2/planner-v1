@@ -37,6 +37,7 @@ export type Database = {
           name: string;
           color: string;
           active: boolean;
+          description: string | null;
           created_at: string;
         },
         {
@@ -44,6 +45,7 @@ export type Database = {
           name: string;
           color: string;
           active?: boolean;
+          description?: string | null;
           created_at?: string;
         },
         {
@@ -51,6 +53,7 @@ export type Database = {
           name?: string;
           color?: string;
           active?: boolean;
+          description?: string | null;
           created_at?: string;
         }
       >;

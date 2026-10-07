@@ -15,7 +15,9 @@ import {
   subMonths,
 } from "date-fns";
 import {
+  BookOpen,
   CalendarCheck2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -224,7 +226,7 @@ async function fetchPlannerData(
         .eq("id", currentUserId)
         .single(),
       client.from("profiles").select("id, display_name, role, is_test, created_at").order("display_name"),
-      client.from("categories").select("id, name, color, active").order("name"),
+      fetchCategories(client),
       client
         .from("team_plans")
         .select("id, title, details, category_id, custom_category, location, plan_date, start_time, end_time, created_by")
@@ -245,6 +247,7 @@ async function fetchPlannerData(
         profile: profileResult.data as Profile,
         profiles: (profilesResult.data ?? []) as Profile[],
         categories: (categoriesResult.data ?? []) as Category[],
+        definitionsEnabled: categoriesResult.definitionsEnabled,
         plans: (plansResult.data ?? []) as Plan[],
       },
       error: null,
@@ -255,6 +258,20 @@ async function fetchPlannerData(
       error: error instanceof Error ? error.message : "Unable to load planner data.",
     };
   }
+}
+
+// Category definitions need the 202610070005 migration; until it runs, load categories without them.
+async function fetchCategories(client: SupabaseClient<Database>) {
+  const result = await client.from("categories").select("id, name, color, active, description").order("name");
+  const missingColumn = result.error?.code === "42703" || /description/i.test(result.error?.message ?? "");
+  if (!missingColumn) return { data: result.data, error: result.error, definitionsEnabled: true };
+
+  const fallback = await client.from("categories").select("id, name, color, active").order("name");
+  return {
+    data: fallback.data?.map((category) => ({ ...category, description: null })) ?? null,
+    error: fallback.error,
+    definitionsEnabled: false,
+  };
 }
 
 export default function Home() {
@@ -298,8 +315,12 @@ export default function Home() {
   const [planHoverCard, setPlanHoverCard] = useState<PlanHoverCard | null>(null);
   const [testProfileId, setTestProfileId] = useState("");
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
+  const [categoryGuideOpen, setCategoryGuideOpen] = useState(false);
+  const [definitionsEnabled, setDefinitionsEnabled] = useState(true);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#4285F4");
+  const [newCategoryDescription, setNewCategoryDescription] = useState("");
   const [categoryBusy, setCategoryBusy] = useState(false);
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
   const [teamUsersLoading, setTeamUsersLoading] = useState(false);
@@ -386,6 +407,7 @@ export default function Home() {
       setProfile(result.data.profile);
       setProfiles(result.data.profiles);
       setCategories(result.data.categories);
+      setDefinitionsEnabled(result.data.definitionsEnabled);
       setVisibleCategoryIds((current) =>
         current
           ? new Set([...current].filter((id) => result.data.categories.some((category) => category.id === id)))
@@ -410,6 +432,7 @@ export default function Home() {
     setProfile(result.data.profile);
     setProfiles(result.data.profiles);
     setCategories(result.data.categories);
+    setDefinitionsEnabled(result.data.definitionsEnabled);
     setVisibleCategoryIds((current) =>
       current
         ? new Set([...current].filter((id) => result.data.categories.some((category) => category.id === id)))
@@ -638,7 +661,12 @@ export default function Home() {
     setPageError("");
     const { error } = await supabase
       .from("categories")
-      .update({ name: category.name.trim(), color: category.color, active: category.active })
+      .update({
+        name: category.name.trim(),
+        color: category.color,
+        active: category.active,
+        ...(definitionsEnabled ? { description: category.description?.trim() || null } : {}),
+      })
       .eq("id", category.id);
     if (error) {
       setPageError(error.message);
@@ -655,13 +683,19 @@ export default function Home() {
     setPageError("");
     const { data, error } = await supabase
       .from("categories")
-      .insert({ name: newCategoryName.trim(), color: newCategoryColor, active: true })
+      .insert({
+        name: newCategoryName.trim(),
+        color: newCategoryColor,
+        active: true,
+        ...(definitionsEnabled ? { description: newCategoryDescription.trim() || null } : {}),
+      })
       .select("id")
       .single();
     if (error) {
       setPageError(error.message);
     } else {
       setNewCategoryName("");
+      setNewCategoryDescription("");
       setVisibleCategoryIds((current) => {
         const next = new Set(current ?? categories.map(({ id }) => id));
         next.add(data.id);
@@ -696,6 +730,11 @@ export default function Home() {
       else next.add(categoryId);
       return next;
     });
+  }
+
+  function openCategoryManager() {
+    setCategoryGuideOpen(false);
+    setCategoryManagerOpen(true);
   }
 
   if (!isSupabaseConfigured) {
@@ -799,6 +838,13 @@ export default function Home() {
   }
 
   const activeCategories = categories.filter((category) => category.active);
+  const visibleCategories = categories.filter((category) => visibleCategoryIds?.has(category.id) ?? true);
+  const categoryFilterSummary =
+    visibleCategories.length === categories.length
+      ? "All categories"
+      : visibleCategories.length === 0
+        ? "None shown"
+        : `${visibleCategories.length} of ${categories.length} shown`;
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const selectedCategory = categoryById.get(planDraft?.category_id ?? "");
   const isOtherCategory = selectedCategory?.name.trim().toLowerCase() === "other";
@@ -1126,28 +1172,61 @@ export default function Home() {
               ))}
             </div>
           </div>
-          <div className="sidebar-section">
+          <div className="sidebar-section category-section">
             <div className="sidebar-heading">
               <div>
                 <h2>Plan categories</h2>
                 <p>Filter the team schedule</p>
               </div>
-              {canManage && <button className="icon-button small-icon" aria-label="Manage categories" title="Manage categories" onClick={() => setCategoryManagerOpen(true)}><Settings2 size={16} /></button>}
+              {canManage && <button className="icon-button small-icon" aria-label="Manage categories" title="Manage categories" onClick={openCategoryManager}><Settings2 size={16} /></button>}
             </div>
-            <div className="category-list">
-              {categories.map((category) => (
-                <label className={`category-filter${category.active ? "" : " inactive-filter"}`} key={category.id}>
-                  <input
-                    type="checkbox"
-                    checked={visibleCategoryIds?.has(category.id) ?? true}
-                    onChange={() => toggleCategory(category.id)}
-                  />
-                  <span className="category-dot" style={{ backgroundColor: category.color }} />
-                  <span>{category.name}</span>
-                </label>
-              ))}
-              {activeCategories.length === 0 && <p className="sidebar-empty">No active categories.</p>}
-            </div>
+            <button
+              className={`category-dropdown-toggle${categoryFilterOpen ? " open" : ""}`}
+              aria-expanded={categoryFilterOpen}
+              aria-controls="category-filter-list"
+              title={`${visibleCategories.length} of ${categories.length} categories shown`}
+              onClick={() => setCategoryFilterOpen((open) => !open)}
+            >
+              <span className="category-dropdown-dots" aria-hidden="true">
+                {visibleCategories.slice(0, 3).map((category) => (
+                  <span key={category.id} style={{ backgroundColor: category.color }} />
+                ))}
+              </span>
+              <span className="category-dropdown-label">{categoryFilterSummary}</span>
+              <ChevronDown size={16} className="category-dropdown-chevron" />
+            </button>
+            {categoryFilterOpen && (
+              <div className="category-dropdown-panel" id="category-filter-list">
+                <div className="category-dropdown-actions">
+                  <button disabled={visibleCategories.length === categories.length} onClick={() => setVisibleCategoryIds(null)}>Show all</button>
+                  <button disabled={visibleCategories.length === 0} onClick={() => setVisibleCategoryIds(new Set())}>Hide all</button>
+                </div>
+                <div className="category-list">
+                  {categories.map((category) => (
+                    <label
+                      className={`category-filter${category.active ? "" : " inactive-filter"}`}
+                      key={category.id}
+                      title={category.description ?? undefined}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibleCategoryIds?.has(category.id) ?? true}
+                        onChange={() => toggleCategory(category.id)}
+                      />
+                      <span className="category-dot" style={{ backgroundColor: category.color }} />
+                      <span>{category.name}</span>
+                    </label>
+                  ))}
+                  {activeCategories.length === 0 && <p className="sidebar-empty">No active categories.</p>}
+                </div>
+              </div>
+            )}
+            <button className="category-guide-button" onClick={() => setCategoryGuideOpen(true)}>
+              <BookOpen size={15} />
+              <span className="category-guide-label">Category definitions</span>
+              <span className="category-guide-label-short">Definitions</span>
+              <ChevronRight size={15} />
+            </button>
           </div>
           <div className="sidebar-tip">
             <span className="tip-icon"><Plus size={16} /></span>
@@ -1337,7 +1416,7 @@ export default function Home() {
         )}
       </div>
 
-      {planHoverCard && !planDraft && !categoryManagerOpen && (() => {
+      {planHoverCard && !planDraft && !categoryManagerOpen && !categoryGuideOpen && (() => {
         const plan = planHoverCard.plan;
         const category = categoryById.get(plan.category_id);
         const ownerName = plan.created_by === activeProfile?.id
@@ -1492,10 +1571,21 @@ export default function Home() {
               </div>
               <button className="icon-button" aria-label="Close dialog" onClick={() => setCategoryManagerOpen(false)}><X size={20} /></button>
             </div>
-            <p className="dialog-date">Choose a color, rename, or deactivate a category.</p>
+            <p className="dialog-date">Choose a color, rename, define, or deactivate a category.</p>
+            {!definitionsEnabled && (
+              <p className="category-migration-note">
+                To add definitions, run <code>supabase/migrations/202610070005_category_definitions.sql</code> in the Supabase SQL editor.
+              </p>
+            )}
             <div className="admin-category-list">
               {categories.map((category) => (
-                <CategoryEditor category={category} key={category.id} disabled={categoryBusy} onSave={saveCategory} />
+                <CategoryEditor
+                  category={category}
+                  key={category.id}
+                  disabled={categoryBusy}
+                  definitionsEnabled={definitionsEnabled}
+                  onSave={saveCategory}
+                />
               ))}
             </div>
             <form className="new-category-form" onSubmit={addCategory}>
@@ -1505,7 +1595,59 @@ export default function Home() {
                 <input aria-label="New category color" type="color" value={newCategoryColor} onChange={(event) => setNewCategoryColor(event.target.value)} />
                 <button className="button button-primary" disabled={categoryBusy}>Add</button>
               </div>
+              {definitionsEnabled && (
+                <textarea
+                  className="category-description-input"
+                  aria-label="New category definition"
+                  value={newCategoryDescription}
+                  onChange={(event) => setNewCategoryDescription(event.target.value)}
+                  maxLength={300}
+                  rows={2}
+                  placeholder="Definition — when should the team use this category?"
+                />
+              )}
             </form>
+          </section>
+        </div>
+      )}
+
+      {categoryGuideOpen && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setCategoryGuideOpen(false);
+        }}>
+          <section className="dialog category-dialog" role="dialog" aria-modal="true" aria-labelledby="category-guide-title">
+            <div className="dialog-header">
+              <div>
+                <span className="eyebrow">CATEGORY GUIDE</span>
+                <h2 id="category-guide-title">Category definitions</h2>
+              </div>
+              <button className="icon-button" aria-label="Close dialog" onClick={() => setCategoryGuideOpen(false)}><X size={20} /></button>
+            </div>
+            <p className="dialog-date">What each category means, so the team labels plans the same way.</p>
+            <dl className="category-guide-list">
+              {categories.map((category) => (
+                <div className={`category-guide-item${category.active ? "" : " inactive"}`} key={category.id}>
+                  <dt>
+                    <span className="category-dot" style={{ backgroundColor: category.color }} />
+                    <span>{category.name}</span>
+                    {!category.active && <em>Inactive</em>}
+                  </dt>
+                  <dd className={category.description ? "" : "empty"}>
+                    {category.description || (canManage ? "No definition yet. Use Edit categories to add one." : "No definition yet.")}
+                  </dd>
+                </div>
+              ))}
+              {categories.length === 0 && <p className="sidebar-empty">No categories yet.</p>}
+            </dl>
+            <div className="dialog-actions">
+              <span className="dialog-spacer" />
+              {canManage && (
+                <button className="button button-outline" onClick={openCategoryManager}>
+                  <Settings2 size={16} /> Edit categories
+                </button>
+              )}
+              <button className="button button-primary" onClick={() => setCategoryGuideOpen(false)}>Done</button>
+            </div>
           </section>
         </div>
       )}
@@ -1516,22 +1658,25 @@ export default function Home() {
 function CategoryEditor({
   category,
   disabled,
+  definitionsEnabled,
   onSave,
 }: {
   category: Category;
   disabled: boolean;
+  definitionsEnabled: boolean;
   onSave: (category: Category) => Promise<void>;
 }) {
   const [name, setName] = useState(category.name);
   const [color, setColor] = useState(category.color);
   const [active, setActive] = useState(category.active);
+  const [description, setDescription] = useState(category.description ?? "");
 
   return (
     <form
       className={`category-editor${active ? "" : " inactive"}`}
       onSubmit={(event) => {
         event.preventDefault();
-        void onSave({ ...category, name: name.trim(), color, active });
+        void onSave({ ...category, name: name.trim(), color, active, description: description.trim() || null });
       }}
     >
       <input className="color-picker" aria-label={`${name} color`} type="color" value={color} onChange={(event) => setColor(event.target.value)} />
@@ -1541,6 +1686,17 @@ function CategoryEditor({
         Active
       </label>
       <button className="button button-outline category-save" disabled={disabled || !name.trim()}>Save</button>
+      {definitionsEnabled && (
+        <textarea
+          className="category-description-input"
+          aria-label={`${name} definition`}
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          maxLength={300}
+          rows={2}
+          placeholder="Definition — when should the team use this category?"
+        />
+      )}
     </form>
   );
 }

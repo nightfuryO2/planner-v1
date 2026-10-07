@@ -62,6 +62,12 @@ in the Supabase SQL editor. Admins can select **Test BOA 1** or **Test BOA 2** f
 admin's real authentication intact; plans created in preview are owned by the selected test
 profile. These are preview profiles, not passwordless authentication accounts.
 
+To add category definitions, apply
+[`supabase/migrations/202610070005_category_definitions.sql`](./supabase/migrations/202610070005_category_definitions.sql)
+in the Supabase SQL editor. Admins can then write a definition for each category in **Manage
+categories**, and everyone can read them from **Category definitions** in the sidebar. Until the
+migration is applied, the planner works as before and the definition fields are hidden.
+
 ## Planner behavior
 
 - Day and Monday-to-Sunday week views, with a date picker and previous/next navigation.
@@ -74,7 +80,8 @@ profile. These are preview profiles, not passwordless authentication accounts.
 - Members can create, edit, and delete their own plans; other members' plans are read-only.
 - Other members' plan notes are private; only the owner and admins can read them.
 - Plan locations are visible to the whole team.
-- Categories are shared across the team. Admins can add, recolor, rename, and deactivate them.
+- Categories are shared across the team. Admins can add, recolor, rename, define, and deactivate them.
+- The category filter is collapsed into a dropdown in the sidebar; its button shows how many categories are shown. **Category definitions** opens a guide to what each category means and stays available whether the dropdown is open or closed.
 - Email confirmation behavior follows the Supabase project's Auth settings.
 
 ## Deploy to Vercel

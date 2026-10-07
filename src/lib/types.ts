@@ -19,6 +19,7 @@ export type Category = {
   name: string;
   color: string;
   active: boolean;
+  description: string | null;
 };
 
 export type Plan = {
