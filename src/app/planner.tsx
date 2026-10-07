@@ -40,9 +40,38 @@ import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabas
 import type { Category, Plan, PositionedPlan, Profile, TeamUser } from "@/lib/types";
 
 const HOUR_HEIGHT = 64;
-const STACKED_CARD_HEIGHT = 58;
-const STACKED_CARD_GAP = 4;
+const MIN_PLAN_HEIGHT = 22;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+const MEMBER_COLORS = [
+  "#3867F4",
+  "#E8710A",
+  "#0B8043",
+  "#A142F4",
+  "#D93025",
+  "#00897B",
+  "#C2185B",
+  "#7CB342",
+  "#F4B400",
+  "#5C6BC0",
+  "#795548",
+  "#039BE5",
+];
+
+type PlanOverflow = {
+  id: string;
+  plans: Plan[];
+  left: number;
+  width: number;
+  top: number;
+  height: number;
+};
+
+type CalendarColumn = {
+  key: string;
+  day: Date;
+  member: Profile | null;
+  plans: Plan[];
+};
 
 type PlanDraft = {
   id?: string;
@@ -74,58 +103,94 @@ function formatTime(value: string) {
   return minute === 0 ? `${displayHour} ${suffix}` : `${displayHour}:${minuteString} ${suffix}`;
 }
 
-function getPositionedPlans(plans: Plan[]): PositionedPlan[] {
-  const ordered = [...plans].sort((first, second) =>
-    first.start_time.localeCompare(second.start_time),
-  );
-  const positioned = new Map<string, PositionedPlan>();
-  let group: Plan[] = [];
-  let groupEnd = "";
-  let verticalCursor = 0;
+function formatDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours && remainder) return `${hours}h ${remainder}m`;
+  return hours ? `${hours}h` : `${remainder}m`;
+}
 
-  const placeGroup = () => {
-    const stacked = group.length > 1;
-    const plannedTop = (timeToMinutes(group[0].start_time) / 60) * HOUR_HEIGHT;
-    const groupTop = Math.max(plannedTop, verticalCursor);
+function getInitials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 1).toUpperCase();
+  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase();
+}
 
-    group.forEach((plan, index) => {
-      const scheduledHeight = Math.max(
-        ((timeToMinutes(plan.end_time) - timeToMinutes(plan.start_time)) / 60) * HOUR_HEIGHT,
-        28,
-      );
-      const displayHeight = stacked ? STACKED_CARD_HEIGHT : scheduledHeight;
-      const displayTop = stacked
-        ? groupTop + index * (STACKED_CARD_HEIGHT + STACKED_CARD_GAP)
-        : groupTop;
-      positioned.set(plan.id, {
-        ...plan,
-        left: 0,
-        width: 100,
-        displayTop,
-        displayHeight,
-        stacked,
+// Places plans at their scheduled time and size. Overlapping plans share the column
+// in side-by-side lanes; beyond maxLanes, the remaining plans collapse into an overflow chip.
+function layoutPlans(plans: Plan[], maxLanes: number) {
+  const items = plans
+    .map((plan) => {
+      const top = (timeToMinutes(plan.start_time) / 60) * HOUR_HEIGHT;
+      const bottom = Math.max((timeToMinutes(plan.end_time) / 60) * HOUR_HEIGHT, top + MIN_PLAN_HEIGHT);
+      return { plan, top, bottom, lane: 0 };
+    })
+    .sort((first, second) => first.top - second.top || second.bottom - first.bottom);
+  const positioned: PositionedPlan[] = [];
+  const overflows: PlanOverflow[] = [];
+  let cluster: typeof items = [];
+  let clusterBottom = -1;
+
+  const placeCluster = () => {
+    const laneBottoms: number[] = [];
+    for (const item of cluster) {
+      const lane = laneBottoms.findIndex((bottom) => bottom <= item.top);
+      item.lane = lane === -1 ? laneBottoms.length : lane;
+      laneBottoms[item.lane] = item.bottom;
+    }
+    const laneCount = Math.min(laneBottoms.length, maxLanes);
+    const visibleLanes = laneBottoms.length > maxLanes ? maxLanes - 1 : laneCount;
+    const hidden: typeof items = [];
+
+    for (const item of cluster) {
+      if (item.lane >= visibleLanes) {
+        hidden.push(item);
+        continue;
+      }
+      let span = 1;
+      while (
+        item.lane + span < visibleLanes &&
+        !cluster.some((other) =>
+          other.lane === item.lane + span && other.top < item.bottom && other.bottom > item.top,
+        )
+      ) {
+        span += 1;
+      }
+      positioned.push({
+        ...item.plan,
+        left: (item.lane / laneCount) * 100,
+        width: (span / laneCount) * 100,
+        top: item.top,
+        height: item.bottom - item.top,
       });
-    });
-    const groupDisplayHeight = stacked
-      ? group.length * STACKED_CARD_HEIGHT + (group.length - 1) * STACKED_CARD_GAP
-      : Math.max(
-          ((timeToMinutes(group[0].end_time) - timeToMinutes(group[0].start_time)) / 60) * HOUR_HEIGHT,
-          28,
-        );
-    const plannedEnd = Math.max(...group.map((plan) => timeToMinutes(plan.end_time))) / 60 * HOUR_HEIGHT;
-    verticalCursor = Math.max(groupTop + groupDisplayHeight, plannedEnd) + 2;
-    group = [];
-    groupEnd = "";
+    }
+
+    if (hidden.length > 0) {
+      const top = Math.min(...hidden.map((item) => item.top));
+      const bottom = Math.max(...hidden.map((item) => item.bottom));
+      overflows.push({
+        id: hidden[0].plan.id,
+        plans: hidden.map((item) => item.plan),
+        left: (visibleLanes / laneCount) * 100,
+        width: 100 / laneCount,
+        top,
+        height: bottom - top,
+      });
+    }
   };
 
-  for (const plan of ordered) {
-    if (group.length > 0 && plan.start_time >= groupEnd) placeGroup();
-    group.push(plan);
-    if (plan.end_time > groupEnd) groupEnd = plan.end_time;
+  for (const item of items) {
+    if (cluster.length > 0 && item.top >= clusterBottom) {
+      placeCluster();
+      cluster = [];
+    }
+    cluster.push(item);
+    clusterBottom = Math.max(clusterBottom, item.bottom);
   }
-  if (group.length > 0) placeGroup();
+  if (cluster.length > 0) placeCluster();
 
-  return ordered.map((plan) => positioned.get(plan.id)!);
+  return { positioned, overflows };
 }
 
 function timeToMinutes(value: string) {
@@ -146,7 +211,7 @@ async function fetchPlannerData(
         .select("id, display_name, role, is_test")
         .eq("id", currentUserId)
         .single(),
-      client.from("profiles").select("id, display_name, role, is_test").order("display_name"),
+      client.from("profiles").select("id, display_name, role, is_test, created_at").order("display_name"),
       client.from("categories").select("id, name, color, active").order("name"),
       client
         .from("team_plans")
@@ -207,6 +272,8 @@ export default function Home() {
   const [pageError, setPageError] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [view, setView] = useState<"day" | "week">("week");
+  const [dayLayout, setDayLayout] = useState<"members" | "combined">("members");
+  const [colorBy, setColorBy] = useState<"member" | "category">("member");
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
   const [planHoverCard, setPlanHoverCard] = useState<PlanHoverCard | null>(null);
   const [testProfileId, setTestProfileId] = useState("");
@@ -431,7 +498,7 @@ export default function Home() {
     if (error) setPageError(error.message);
   }
 
-  function openNewPlan(startTime = "09:00", planDate = selectedDate) {
+  function openNewPlan(startTime = "09:00", planDate = selectedDate, ownerId?: string) {
     const startMinutes = Math.floor(timeToMinutes(startTime) / 30) * 30;
     const start = `${String(Math.floor(startMinutes / 60)).padStart(2, "0")}:${String(startMinutes % 60).padStart(2, "0")}`;
     const endMinutes = Math.min(startMinutes + 60, 23 * 60 + 30);
@@ -445,7 +512,7 @@ export default function Home() {
       plan_date: format(planDate, "yyyy-MM-dd"),
       start_time: start,
       end_time: end,
-      created_by: activeProfile?.id ?? session?.user.id,
+      created_by: ownerId ?? activeProfile?.id ?? session?.user.id,
     });
   }
 
@@ -690,6 +757,42 @@ export default function Home() {
   const selectedCategory = categoryById.get(planDraft?.category_id ?? "");
   const isOtherCategory = selectedCategory?.name.trim().toLowerCase() === "other";
   const profileById = new Map(profiles.map((member) => [member.id, member]));
+  const memberColorById = new Map(
+    [...profiles]
+      .sort((first, second) =>
+        (first.created_at ?? "").localeCompare(second.created_at ?? "") || first.id.localeCompare(second.id),
+      )
+      .map((member, index) => [member.id, MEMBER_COLORS[index % MEMBER_COLORS.length]]),
+  );
+  const visiblePlans = plans.filter((plan) => visibleCategoryIds?.has(plan.category_id) ?? true);
+  const selectedDayKey = format(selectedDate, "yyyy-MM-dd");
+  const selectedDayPlans = visiblePlans.filter((plan) => plan.plan_date === selectedDayKey);
+  const calendarMembers = profiles
+    .filter((member) =>
+      !member.is_test ||
+      member.id === activeProfile?.id ||
+      selectedDayPlans.some((plan) => plan.created_by === member.id),
+    )
+    .sort((first, second) =>
+      Number(second.id === activeProfile?.id) - Number(first.id === activeProfile?.id) ||
+      first.display_name.localeCompare(second.display_name),
+    );
+  const legendMembers = profiles.filter((member) => !member.is_test || isAdmin);
+  const memberMode = view === "day" && dayLayout === "members" && calendarMembers.length > 0;
+  const calendarColumns: CalendarColumn[] = memberMode
+    ? calendarMembers.map((member) => ({
+        key: member.id,
+        day: selectedDate,
+        member,
+        plans: selectedDayPlans.filter((plan) => plan.created_by === member.id),
+      }))
+    : visibleDays.map((day) => ({
+        key: day.toISOString(),
+        day,
+        member: null,
+        plans: visiblePlans.filter((plan) => plan.plan_date === format(day, "yyyy-MM-dd")),
+      }));
+  const maxLanes = view === "day" && !memberMode ? 6 : 3;
   const filteredTeamUsers = teamUsers.filter((user) => {
     const query = teamUserSearch.trim().toLowerCase();
     return !query ||
@@ -908,6 +1011,47 @@ export default function Home() {
               ))}
             </div>
           </div>
+          <div className="sidebar-section display-section">
+            <div className="sidebar-heading">
+              <div>
+                <h2>Display</h2>
+                <p>Choose how plans are shown</p>
+              </div>
+            </div>
+            <div className="display-option">
+              <span>Color by</span>
+              <div className="segmented-control" role="group" aria-label="Color plans by">
+                <button className={colorBy === "member" ? "selected" : ""} aria-pressed={colorBy === "member"} onClick={() => setColorBy("member")}>Member</button>
+                <button className={colorBy === "category" ? "selected" : ""} aria-pressed={colorBy === "category"} onClick={() => setColorBy("category")}>Category</button>
+              </div>
+            </div>
+            {view === "day" && (
+              <div className="display-option">
+                <span>Day layout</span>
+                <div className="segmented-control" role="group" aria-label="Day layout">
+                  <button className={dayLayout === "members" ? "selected" : ""} aria-pressed={dayLayout === "members"} onClick={() => setDayLayout("members")}>By member</button>
+                  <button className={dayLayout === "combined" ? "selected" : ""} aria-pressed={dayLayout === "combined"} onClick={() => setDayLayout("combined")}>Combined</button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="sidebar-section member-legend-section">
+            <div className="sidebar-heading">
+              <div>
+                <h2>Team members</h2>
+                <p>{colorBy === "member" ? "Each member's plans use their color" : "Initials mark who owns each plan"}</p>
+              </div>
+            </div>
+            <div className="member-legend-list">
+              {legendMembers.map((member) => (
+                <div className="member-legend" key={member.id}>
+                  <span className="member-avatar" style={{ backgroundColor: memberColorById.get(member.id) }}>{getInitials(member.display_name)}</span>
+                  <span className="member-legend-name">{member.display_name}</span>
+                  {member.id === activeProfile?.id && <em>You</em>}
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="sidebar-section">
             <div className="sidebar-heading">
               <div>
@@ -960,10 +1104,28 @@ export default function Home() {
             </div>
           ) : (
             <div className="calendar-scroll">
-              <div className={`calendar-grid ${view === "day" ? "day-view" : "week-view"}`} style={{ "--hour-height": `${HOUR_HEIGHT}px`, "--day-count": visibleDays.length } as React.CSSProperties}>
+              <div className={`calendar-grid ${view === "day" ? "day-view" : "week-view"}${memberMode ? " member-view" : ""}`} style={{ "--hour-height": `${HOUR_HEIGHT}px`, "--day-count": calendarColumns.length } as React.CSSProperties}>
                 <div className="calendar-head">
                   <div className="timezone-head">GMT{new Date().getTimezoneOffset() <= 0 ? "+" : "−"}{String(Math.floor(Math.abs(new Date().getTimezoneOffset()) / 60)).padStart(2, "0")}:00</div>
-                  {visibleDays.map((day) => (
+                  {memberMode ? calendarColumns.map(({ key, member, plans: memberPlans }) => {
+                    const plannedMinutes = memberPlans.reduce(
+                      (total, plan) => total + timeToMinutes(plan.end_time) - timeToMinutes(plan.start_time),
+                      0,
+                    );
+                    return (
+                      <div className={`member-head${member?.id === activeProfile?.id ? " own-member" : ""}`} key={key}>
+                        <span className="member-avatar" style={{ backgroundColor: memberColorById.get(member?.id ?? "") }}>{getInitials(member?.display_name ?? "")}</span>
+                        <span className="member-head-text">
+                          <strong>{member?.display_name}{member?.id === activeProfile?.id && <em>You</em>}</strong>
+                          <small>
+                            {memberPlans.length === 0
+                              ? "No plans"
+                              : `${memberPlans.length} ${memberPlans.length === 1 ? "plan" : "plans"} · ${formatDuration(plannedMinutes)}`}
+                          </small>
+                        </span>
+                      </div>
+                    );
+                  }) : visibleDays.map((day) => (
                     <button
                       className={`day-head${isSameDay(day, new Date()) ? " current-day" : ""}${day.getDay() === 0 ? " sunday" : ""}`}
                       key={day.toISOString()}
@@ -985,46 +1147,51 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
-                  {visibleDays.map((day) => {
-                    const dayPlans = getPositionedPlans(
-                      plans.filter((plan) =>
-                        plan.plan_date === format(day, "yyyy-MM-dd") &&
-                        (visibleCategoryIds?.has(plan.category_id) ?? true),
-                      ),
-                    );
+                  {calendarColumns.map(({ key, day, member, plans: columnPlans }) => {
+                    const { positioned, overflows } = layoutPlans(columnPlans, maxLanes);
+                    const canCreateHere = !member ||
+                      member.id === activeProfile?.id ||
+                      (canManage && !member.is_test);
+                    const columnClass = member
+                      ? `day-column member-column${member.id === activeProfile?.id ? " own-member-column" : ""}`
+                      : `day-column${isSameDay(day, new Date()) ? " current-day-column" : ""}${day.getDay() === 0 ? " sunday-column" : ""}`;
                     return (
-                      <div className={`day-column${isSameDay(day, new Date()) ? " current-day-column" : ""}${day.getDay() === 0 ? " sunday-column" : ""}`} key={day.toISOString()}>
-                        {HOURS.map((hour) => (
+                      <div className={columnClass} key={key}>
+                        {HOURS.map((hour) => canCreateHere ? (
                           <button
                             className="hour-cell"
                             key={hour}
-                            aria-label={`Add a plan at ${format(new Date(2020, 0, 1, hour), "h a")} on ${format(day, "EEEE, MMMM d")}`}
+                            aria-label={`Add a plan${member && member.id !== activeProfile?.id ? ` for ${member.display_name}` : ""} at ${format(new Date(2020, 0, 1, hour), "h a")} on ${format(day, "EEEE, MMMM d")}`}
                             onClick={() => {
                               setSelectedDate(day);
                               setView("day");
-                              openNewPlan(`${String(hour).padStart(2, "0")}:00`, day);
+                              openNewPlan(`${String(hour).padStart(2, "0")}:00`, day, member?.id);
                             }}
                           />
+                        ) : (
+                          <div className="hour-cell locked" key={hour} aria-hidden="true" />
                         ))}
-                        {dayPlans.map((plan) => {
+                        {positioned.map((plan) => {
                           const category = categoryById.get(plan.category_id);
                           const owner = profileById.get(plan.created_by);
                           const ownPlan = plan.created_by === activeProfile?.id;
-                          const top = plan.displayTop;
-                          const height = plan.displayHeight;
                           const categoryName = plan.custom_category || category?.name || "Category";
                           const ownerName = ownPlan ? "You" : owner?.display_name ?? "Team member";
+                          const memberColor = memberColorById.get(plan.created_by) ?? "#9aa0a6";
+                          const categoryColor = category?.color ?? "#9aa0a6";
+                          const accentColor = colorBy === "member" ? memberColor : categoryColor;
+                          const duration = formatDuration(timeToMinutes(plan.end_time) - timeToMinutes(plan.start_time));
                           return (
                             <button
-                              className={`plan-block interactive${plan.stacked ? " stacked" : ""}${height < 58 ? " compact" : ""}${height < 40 ? " tiny" : ""}`}
+                              className={`plan-block interactive${plan.height < 58 ? " compact" : ""}${plan.height < 40 ? " tiny" : ""}`}
                               key={plan.id}
                               style={{
-                                top: `${top}px`,
-                                height: `${height}px`,
+                                top: `${plan.top}px`,
+                                height: `${plan.height - 1}px`,
                                 left: `calc(${plan.left}% + 2px)`,
                                 width: `calc(${plan.width}% - 4px)`,
-                                backgroundColor: category ? `${category.color}32` : "#e8eaed",
-                                borderLeftColor: category?.color ?? "#9aa0a6",
+                                backgroundColor: `${accentColor}32`,
+                                borderLeftColor: accentColor,
                                 color: "#202124",
                               }}
                               onClick={() => openExistingPlan(plan)}
@@ -1036,17 +1203,47 @@ export default function Home() {
                               aria-describedby={planHoverCard?.plan.id === plan.id ? "plan-hover-card" : undefined}
                             >
                               <span className="plan-title">{plan.title}</span>
-                              <span className="plan-time">{formatTime(plan.start_time)} – {formatTime(plan.end_time)}</span>
+                              <span className="plan-time">{formatTime(plan.start_time)} – {formatTime(plan.end_time)} · {duration}</span>
                               <span className="plan-identifiers">
                                 <span className="plan-owner">
-                                  <span className="plan-owner-initial">{ownerName.slice(0, 1).toUpperCase()}</span>
+                                  <span className="plan-owner-initial" style={{ backgroundColor: memberColor }}>{getInitials(owner?.display_name ?? ownerName)}</span>
                                   <span className="plan-owner-name">{ownerName}</span>
                                 </span>
                                 <span className="plan-category">
-                                  <span className="plan-category-dot" style={{ backgroundColor: category?.color ?? "#9aa0a6" }} />
+                                  <span className="plan-category-dot" style={{ backgroundColor: categoryColor }} />
                                   <span className="plan-category-name">{categoryName}</span>
                                 </span>
                               </span>
+                            </button>
+                          );
+                        })}
+                        {overflows.map((overflow) => {
+                          const summary = overflow.plans
+                            .map((plan) => `${plan.title} (${formatTime(plan.start_time)} – ${formatTime(plan.end_time)})`)
+                            .join(", ");
+                          return (
+                            <button
+                              className="plan-overflow"
+                              key={overflow.id}
+                              style={{
+                                top: `${overflow.top}px`,
+                                height: `${overflow.height - 1}px`,
+                                left: `calc(${overflow.left}% + 2px)`,
+                                width: `calc(${overflow.width}% - 4px)`,
+                              }}
+                              title={summary}
+                              aria-label={`${overflow.plans.length} more ${overflow.plans.length === 1 ? "plan" : "plans"}: ${summary}`}
+                              onClick={() => {
+                                if (memberMode) {
+                                  openExistingPlan(overflow.plans[0]);
+                                  return;
+                                }
+                                setSelectedDate(day);
+                                setView("day");
+                                setDayLayout("members");
+                              }}
+                            >
+                              +{overflow.plans.length}
                             </button>
                           );
                         })}
@@ -1091,7 +1288,9 @@ export default function Home() {
               <span>{format(new Date(`${plan.plan_date}T00:00:00`), "EEE, MMM d")} · {formatTime(plan.start_time)} – {formatTime(plan.end_time)}</span>
             </div>
             <div className="plan-hover-row">
-              <span className="plan-hover-avatar">{ownerName.slice(0, 1).toUpperCase()}</span>
+              <span className="plan-hover-avatar" style={{ color: "#fff", backgroundColor: memberColorById.get(plan.created_by) ?? "#9aa0a6" }}>
+                {getInitials(profileById.get(plan.created_by)?.display_name ?? ownerName)}
+              </span>
               <span>{ownerName}</span>
             </div>
             {plan.location && (

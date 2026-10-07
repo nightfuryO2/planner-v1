@@ -37,7 +37,6 @@ export type Plan = {
 export type PositionedPlan = Plan & {
   left: number;
   width: number;
-  displayTop: number;
-  displayHeight: number;
-  stacked: boolean;
+  top: number;
+  height: number;
 };

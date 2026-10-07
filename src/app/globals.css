@@ -533,6 +533,78 @@ textarea:focus-visible {
   gap: 2px;
 }
 
+.display-option {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.display-option > span {
+  color: #5b6880;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.segmented-control {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  padding: 3px;
+  border: 1px solid #dbe2ee;
+  border-radius: 9px;
+  background: #e9eef6;
+}
+
+.segmented-control button {
+  min-height: 27px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  color: #4a5870;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segmented-control button.selected {
+  color: #1d2c47;
+  background: #fff;
+  box-shadow: 0 1px 3px #1d2c4726;
+  font-weight: 650;
+}
+
+.member-legend-list {
+  max-height: 210px;
+  display: grid;
+  gap: 2px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.member-legend {
+  min-height: 31px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 7px;
+  color: #3b4a62;
+  font-size: 13px;
+}
+
+.member-legend .member-avatar {
+  min-width: 22px;
+  height: 22px;
+  font-size: 9px;
+}
+
+.member-legend-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .category-filter {
   min-height: 33px;
   display: flex;
@@ -908,17 +980,17 @@ textarea:focus-visible {
 }
 
 .plan-owner-initial {
-  width: 15px;
-  height: 15px;
+  min-width: 16px;
+  height: 16px;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  border: 1px solid #ffffffc4;
-  border-radius: 50%;
-  color: #34445e;
-  background: #ffffffa8;
+  padding: 0 3px;
+  border-radius: 8px;
+  color: #fff;
   font-size: 8px;
   font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
 .plan-category-dot,
@@ -946,12 +1018,6 @@ textarea:focus-visible {
   display: none;
 }
 
-.plan-block.stacked {
-  gap: 2px;
-  padding-top: 5px;
-  padding-bottom: 5px;
-}
-
 @container (max-width: 120px) {
   .plan-identifiers {
     grid-template-columns: auto auto;
@@ -962,6 +1028,117 @@ textarea:focus-visible {
   .plan-category-name {
     display: none;
   }
+}
+
+@container (max-width: 72px) {
+  .plan-identifiers {
+    grid-template-columns: auto;
+  }
+
+  .plan-category {
+    display: none;
+  }
+}
+
+.plan-overflow {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 6px 2px;
+  border: 1px dashed #9fb0cc;
+  border-radius: 7px;
+  color: #33435d;
+  background: #eef2f9e6;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plan-overflow:hover {
+  z-index: 6;
+  border-color: var(--blue);
+  color: var(--blue-dark);
+  background: #e6edff;
+}
+
+.hour-cell.locked,
+.hour-cell.locked:hover {
+  background: transparent;
+  cursor: default;
+}
+
+.calendar-grid.member-view {
+  min-width: max(650px, calc(58px + var(--day-count) * 150px));
+}
+
+.member-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px 8px;
+  border-left: 1px solid #edf0f5;
+}
+
+.member-head.own-member {
+  background: #f3f6ff;
+}
+
+.member-head-text {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.member-head-text strong {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  color: #24334d;
+  font-size: 13px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-head-text small {
+  color: #748198;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.member-head-text em,
+.member-legend em {
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: #294fd0;
+  background: #e3eaff;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.member-avatar {
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 13px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.day-column.own-member-column {
+  background-color: #f9fbff;
 }
 
 .plan-hover-card {
@@ -1020,11 +1197,12 @@ textarea:focus-visible {
 }
 
 .plan-hover-avatar {
-  width: 17px;
-  height: 17px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 3px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: 10px;
   color: #34445e;
   background: #edf1f7;
   font-size: 9px;
@@ -2587,5 +2765,57 @@ textarea:focus-visible {
   .team-admin-panel {
     margin: 8px;
     padding: 19px 12px;
+  }
+}
+
+@media (max-width: 760px) {
+  .calendar-grid.member-view {
+    min-width: max(100%, calc(47px + var(--day-count) * 118px));
+  }
+
+  .member-head {
+    gap: 6px;
+    padding: 8px 4px;
+  }
+
+  .member-head-text strong {
+    font-size: 11px;
+  }
+
+  .member-head-text small {
+    font-size: 9px;
+  }
+
+  .member-head .member-avatar {
+    min-width: 22px;
+    height: 22px;
+    font-size: 9px;
+  }
+
+  .display-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-bottom: 8px;
+  }
+
+  .display-section .sidebar-heading {
+    display: none;
+  }
+
+  .display-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+  }
+
+  .segmented-control button {
+    min-height: 24px;
+    font-size: 11px;
+  }
+
+  .member-legend-section {
+    display: none;
   }
 }
