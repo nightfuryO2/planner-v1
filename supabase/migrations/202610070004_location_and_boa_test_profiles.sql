@@ -4,6 +4,17 @@ alter table public.profiles
 alter table public.profiles
   drop constraint if exists profiles_id_fkey;
 
+alter table public.profiles
+  drop constraint if exists profiles_role_check;
+
+update public.profiles
+set role = 'boa'
+where role = 'member';
+
+alter table public.profiles
+  alter column role set default 'boa',
+  add constraint profiles_role_check check (role in ('boa', 'admin'));
+
 insert into public.profiles (id, display_name, role, is_test)
 values
   ('00000000-0000-4000-8000-000000000001', 'Test BOA 1', 'boa', true),
