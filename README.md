@@ -55,6 +55,13 @@ To allow members to add a custom category on a plan, apply
 in the Supabase SQL editor. The plan form will then show an **Other** category option and request
 a custom category name.
 
+For shared plan locations and two admin-only BOA preview profiles, apply
+[`supabase/migrations/202610070004_location_and_boa_test_profiles.sql`](./supabase/migrations/202610070004_location_and_boa_test_profiles.sql)
+in the Supabase SQL editor. Admins can select **Test BOA 1** or **Test BOA 2** from the planner's
+**Preview BOA** control. Preview mode uses BOA permissions in the interface while keeping the
+admin's real authentication intact; plans created in preview are owned by the selected test
+profile. These are preview profiles, not passwordless authentication accounts.
+
 ## Planner behavior
 
 - Day and Monday-to-Sunday week views, with a date picker and previous/next navigation.
@@ -63,6 +70,7 @@ a custom category name.
 - Refresh the schedule after another member adds or changes a plan.
 - Members can create, edit, and delete their own plans; other members' plans are read-only.
 - Other members' plan notes are private; only the owner and admins can read them.
+- Plan locations are visible to the whole team.
 - Categories are shared across the team. Admins can add, recolor, rename, and deactivate them.
 - Email confirmation behavior follows the Supabase project's Auth settings.
 

@@ -13,18 +13,21 @@ export type Database = {
           id: string;
           display_name: string;
           role: "boa" | "admin";
+          is_test: boolean;
           created_at: string;
         },
         {
           id: string;
           display_name: string;
           role?: "boa" | "admin";
+          is_test?: boolean;
           created_at?: string;
         },
         {
           id?: string;
           display_name?: string;
           role?: "boa" | "admin";
+          is_test?: boolean;
           created_at?: string;
         }
       >;
@@ -58,6 +61,7 @@ export type Database = {
           details: string | null;
           category_id: string;
           custom_category: string | null;
+          location: string | null;
           plan_date: string;
           start_time: string;
           end_time: string;
@@ -71,6 +75,7 @@ export type Database = {
           details?: string | null;
           category_id: string;
           custom_category?: string | null;
+          location?: string | null;
           plan_date: string;
           start_time: string;
           end_time: string;
@@ -84,6 +89,7 @@ export type Database = {
           details?: string | null;
           category_id?: string;
           custom_category?: string | null;
+          location?: string | null;
           plan_date?: string;
           start_time?: string;
           end_time?: string;
@@ -101,6 +107,7 @@ export type Database = {
           details: string | null;
           category_id: string;
           custom_category: string | null;
+          location: string | null;
           plan_date: string;
           start_time: string;
           end_time: string;

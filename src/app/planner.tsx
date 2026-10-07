@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  MapPin,
   Plus,
   RefreshCw,
   Search,
@@ -46,6 +47,7 @@ type PlanDraft = {
   details: string;
   category_id: string;
   custom_category: string;
+  location: string;
   plan_date: string;
   start_time: string;
   end_time: string;
@@ -118,14 +120,14 @@ async function fetchPlannerData(
     const [profileResult, profilesResult, categoriesResult, plansResult] = await Promise.all([
       client
         .from("profiles")
-        .select("id, display_name, role")
+        .select("id, display_name, role, is_test")
         .eq("id", currentUserId)
         .single(),
-      client.from("profiles").select("id, display_name, role").order("display_name"),
+      client.from("profiles").select("id, display_name, role, is_test").order("display_name"),
       client.from("categories").select("id, name, color, active").order("name"),
       client
         .from("team_plans")
-        .select("id, title, details, category_id, custom_category, plan_date, start_time, end_time, created_by")
+        .select("id, title, details, category_id, custom_category, location, plan_date, start_time, end_time, created_by")
         .gte("plan_date", rangeStart)
         .lte("plan_date", rangeEnd)
         .order("start_time"),
@@ -183,6 +185,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [view, setView] = useState<"day" | "week">("week");
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
+  const [testProfileId, setTestProfileId] = useState("");
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#4285F4");
@@ -202,6 +205,11 @@ export default function Home() {
 
   const rangeStart = format(visibleDays[0], "yyyy-MM-dd");
   const rangeEnd = format(visibleDays[visibleDays.length - 1], "yyyy-MM-dd");
+  const isAdmin = profile?.role === "admin";
+  const testProfile = profiles.find((member) => member.id === testProfileId && member.is_test) ?? null;
+  const isPreviewMode = Boolean(isAdmin && testProfile);
+  const activeProfile = isPreviewMode ? testProfile : profile;
+  const canManage = Boolean(isAdmin && !isPreviewMode);
 
   useEffect(() => {
     if (!supabase) return;
@@ -222,6 +230,7 @@ export default function Home() {
         currentUserIdRef.current = nextUserId;
         setProfile(null);
         setProfiles([]);
+        setTestProfileId("");
         setCategories([]);
         setPlans([]);
         setVisibleCategoryIds(null);
@@ -288,14 +297,14 @@ export default function Home() {
     setTeamUsersLoading(true);
     setTeamUsersError("");
     try {
-      if (profile.role === "admin") {
+      if (canManage) {
         const { data, error } = await supabase.rpc("admin_list_users");
         if (error) setTeamUsersError(error.message);
         else setTeamUsers(data);
       } else {
         const { data, error } = await supabase
           .from("profiles")
-          .select("id, display_name, role, created_at")
+          .select("id, display_name, role, is_test, created_at")
           .order("display_name");
         if (error) {
           setTeamUsersError(error.message);
@@ -314,7 +323,7 @@ export default function Home() {
     } finally {
       setTeamUsersLoading(false);
     }
-  }, [profile, supabase]);
+  }, [canManage, profile, supabase]);
 
   useEffect(() => {
     if (showTeamPage && profile) {
@@ -323,7 +332,7 @@ export default function Home() {
   }, [loadTeamUsers, profile, showTeamPage]);
 
   async function updateTeamUserRole(user: TeamUser) {
-    if (!supabase || profile?.role !== "admin") return;
+    if (!supabase || !canManage || !profile) return;
     const newRole = user.role === "admin" ? "boa" : "admin";
     setUpdatingUserId(user.user_id);
     setTeamUsersError("");
@@ -393,22 +402,24 @@ export default function Home() {
       details: "",
       category_id: categories.find((category) => category.active)?.id ?? "",
       custom_category: "",
+      location: "",
       plan_date: format(planDate, "yyyy-MM-dd"),
       start_time: start,
       end_time: end,
-      created_by: session?.user.id,
+      created_by: activeProfile?.id ?? session?.user.id,
     });
   }
 
   function openExistingPlan(plan: Plan) {
-    const canEdit = profile?.role === "admin" || plan.created_by === session?.user.id;
+    const canEdit = canManage || plan.created_by === activeProfile?.id;
     setSelectedDate(new Date(`${plan.plan_date}T00:00:00`));
     setPlanDraft({
       id: plan.id,
       title: plan.title,
-      details: plan.details ?? "",
+      details: canEdit ? plan.details ?? "" : "",
       category_id: plan.category_id,
       custom_category: plan.custom_category ?? "",
+      location: plan.location ?? "",
       plan_date: plan.plan_date,
       start_time: plan.start_time.slice(0, 5),
       end_time: plan.end_time.slice(0, 5),
@@ -439,6 +450,7 @@ export default function Home() {
       details: planDraft.details.trim() || null,
       category_id: planDraft.category_id,
       custom_category: isOtherCategory ? planDraft.custom_category.trim() : null,
+      location: planDraft.location.trim() || null,
       plan_date: planDraft.plan_date,
       start_time: planDraft.start_time,
       end_time: planDraft.end_time,
@@ -448,7 +460,7 @@ export default function Home() {
       ? await supabase.from("plans").update(values).eq("id", planDraft.id).select("id").single()
       : await supabase
           .from("plans")
-          .insert({ ...values, created_by: isAdmin ? planDraft.created_by ?? session.user.id : session.user.id })
+          .insert({ ...values, created_by: canManage ? planDraft.created_by ?? session.user.id : activeProfile?.id ?? session.user.id })
           .select("id")
           .single();
 
@@ -478,7 +490,7 @@ export default function Home() {
   }
 
   async function saveCategory(category: Category) {
-    if (!supabase || !session || profile?.role !== "admin") return;
+    if (!supabase || !session || !canManage) return;
     setCategoryBusy(true);
     setPageError("");
     const { error } = await supabase
@@ -495,7 +507,7 @@ export default function Home() {
 
   async function addCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!supabase || !session || profile?.role !== "admin") return;
+    if (!supabase || !session || !canManage) return;
     setCategoryBusy(true);
     setPageError("");
     const { data, error } = await supabase
@@ -633,7 +645,6 @@ export default function Home() {
     );
   }
 
-  const isAdmin = profile?.role === "admin";
   const activeCategories = categories.filter((category) => category.active);
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const selectedCategory = categoryById.get(planDraft?.category_id ?? "");
@@ -700,11 +711,34 @@ export default function Home() {
             <RefreshCw size={17} />
           </button>
           <div className="user-menu">
-            <span className="user-avatar">{(profile?.display_name || session.user.email || "T").slice(0, 1).toUpperCase()}</span>
-            <span className="user-name">{profile?.display_name || session.user.email}</span>
-            {isAdmin && <span className="role-pill">Admin</span>}
+            <span className="user-avatar">{(activeProfile?.display_name || session.user.email || "T").slice(0, 1).toUpperCase()}</span>
+            <span className="user-name">{activeProfile?.display_name || session.user.email}</span>
+            {isPreviewMode ? (
+              <span className="role-pill">BOA preview</span>
+            ) : isAdmin ? (
+              <span className="role-pill">Admin</span>
+            ) : null}
             <button className="icon-button signout-button" aria-label="Sign out" title="Sign out" onClick={() => void signOut()}><LogOut size={18} /></button>
           </div>
+          {isAdmin && (
+            <label className="test-preview-control">
+              <span>Preview BOA</span>
+              <select
+                aria-label="Preview the planner as a test BOA member"
+                value={isPreviewMode ? testProfile?.id ?? "" : ""}
+                onChange={(event) => {
+                  setTestProfileId(event.target.value);
+                  setCategoryManagerOpen(false);
+                  setPlanDraft(null);
+                }}
+              >
+                <option value="">Admin view</option>
+                {profiles.filter((member) => member.is_test).map((member) => (
+                  <option key={member.id} value={member.id}>{member.display_name}</option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
       </header>
 
@@ -740,20 +774,20 @@ export default function Home() {
                   type="search"
                   value={teamUserSearch}
                   onChange={(event) => setTeamUserSearch(event.target.value)}
-                  placeholder={isAdmin ? "Search by name or email" : "Search by name"}
+                  placeholder={canManage ? "Search by name or email" : "Search by name"}
                   aria-label="Search team members"
                 />
               </label>
-              <p>{isAdmin ? "Manage user access across the team." : "Team directory · read-only access"}</p>
+              <p>{canManage ? "Manage user access across the team." : "Team directory · read-only access"}</p>
             </div>
 
             {teamUsersError && <div className="team-admin-error" role="alert">{teamUsersError}</div>}
-            <div className={`team-user-list${isAdmin ? " admin-user-list" : ""}`} aria-live="polite">
+            <div className={`team-user-list${canManage ? " admin-user-list" : ""}`} aria-live="polite">
               <div className="team-user-list-head">
                 <span>Member</span>
                 <span>Access</span>
                 <span>Joined</span>
-                {isAdmin && <span>Manage access</span>}
+                {canManage && <span>Manage access</span>}
               </div>
               {teamUsersLoading || !profile ? (
                 <div className="team-user-empty"><span className="spinner" /> Loading team members</div>
@@ -769,7 +803,7 @@ export default function Home() {
                         {user.display_name.slice(0, 1).toUpperCase()}
                       </span>
                       <span className="team-user-names">
-                        <strong>{user.display_name}{user.user_id === session.user.id && <em>You</em>}</strong>
+                        <strong>{user.display_name}{user.user_id === activeProfile?.id && <em>You</em>}</strong>
                         {user.email && <span>{user.email}</span>}
                       </span>
                     </div>
@@ -780,7 +814,7 @@ export default function Home() {
                     <time className="team-user-joined" dateTime={user.joined_at}>
                       {format(new Date(user.joined_at), "MMM d, yyyy")}
                     </time>
-                    {isAdmin && <div className="team-user-action">
+                    {canManage && <div className="team-user-action">
                       {user.role === "admin" && adminCount <= 1 ? (
                         <span className="last-admin-note">Last admin</span>
                       ) : (
@@ -801,7 +835,7 @@ export default function Home() {
             </div>
             <div className="team-admin-footnote">
               <ShieldCheck size={15} />
-              <span>{isAdmin ? "Role changes take effect immediately and are enforced by the database." : "Only admins can change team access."}</span>
+              <span>{canManage ? "Role changes take effect immediately and are enforced by the database." : "Only admins can change team access."}</span>
             </div>
           </section>
         ) : (
@@ -840,7 +874,7 @@ export default function Home() {
                 <h2>Plan categories</h2>
                 <p>Filter the team schedule</p>
               </div>
-              {isAdmin && <button className="icon-button small-icon" aria-label="Manage categories" title="Manage categories" onClick={() => setCategoryManagerOpen(true)}><Settings2 size={16} /></button>}
+              {canManage && <button className="icon-button small-icon" aria-label="Manage categories" title="Manage categories" onClick={() => setCategoryManagerOpen(true)}><Settings2 size={16} /></button>}
             </div>
             <div className="category-list">
               {categories.map((category) => (
@@ -935,7 +969,7 @@ export default function Home() {
                         {dayPlans.map((plan) => {
                           const category = categoryById.get(plan.category_id);
                           const owner = profileById.get(plan.created_by);
-                          const ownPlan = plan.created_by === session.user.id;
+                          const ownPlan = plan.created_by === activeProfile?.id;
                           const start = timeToMinutes(plan.start_time);
                           const end = timeToMinutes(plan.end_time);
                           const top = (start / 60) * HOUR_HEIGHT;
@@ -959,6 +993,7 @@ export default function Home() {
                               <span className="plan-title">{plan.title}</span>
                               <span className="plan-time">{formatTime(plan.start_time)} – {formatTime(plan.end_time)}</span>
                               <span className="plan-owner">{ownPlan ? "You" : owner?.display_name ?? "Team member"} · {plan.custom_category || category?.name || "Category"}</span>
+                              {plan.location && <span className="plan-location"><MapPin size={10} />{plan.location}</span>}
                             </button>
                           );
                         })}
@@ -993,7 +1028,7 @@ export default function Home() {
             <p className="dialog-date">{format(new Date(`${planDraft.plan_date}T00:00:00`), "EEEE, MMMM d, yyyy")}</p>
             {planDraft.readOnly && <p className="plan-owner-row">Planned by <strong>{planDraft.ownerName}</strong></p>}
             <form className="plan-form" onSubmit={savePlan}>
-              {!planDraft.id && isAdmin && (
+              {!planDraft.id && canManage && (
                 <label>
                   Create plan for
                   <select
@@ -1001,7 +1036,7 @@ export default function Home() {
                     onChange={(event) => setPlanDraft({ ...planDraft, created_by: event.target.value })}
                     required
                   >
-                    {profiles.map((member) => (
+                    {profiles.filter((member) => !member.is_test).map((member) => (
                       <option key={member.id} value={member.id}>
                         {member.id === session.user.id ? `${member.display_name} (you)` : member.display_name}
                       </option>
@@ -1039,6 +1074,22 @@ export default function Home() {
                 <span className="time-separator">to</span>
                 <label>End time<input type="time" value={planDraft.end_time} onChange={(event) => setPlanDraft({ ...planDraft, end_time: event.target.value })} required disabled={planDraft.readOnly} /></label>
               </div>
+              {planDraft.readOnly ? (
+                <div className="plan-notes-readonly">
+                  <span>Location</span>
+                  <p>{planDraft.location || "No location specified."}</p>
+                </div>
+              ) : (
+                <label>
+                  Location <span className="optional-label">Optional</span>
+                  <input
+                    value={planDraft.location}
+                    onChange={(event) => setPlanDraft({ ...planDraft, location: event.target.value })}
+                    maxLength={120}
+                    placeholder="Where will you be?"
+                  />
+                </label>
+              )}
               {planDraft.readOnly ? (
                 <div className="plan-notes-readonly">
                   <span>Notes</span>

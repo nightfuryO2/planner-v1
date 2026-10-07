@@ -2,6 +2,7 @@ export type Profile = {
   id: string;
   display_name: string;
   role: "boa" | "admin";
+  is_test: boolean;
   created_at?: string;
 };
 
@@ -26,6 +27,7 @@ export type Plan = {
   details: string | null;
   category_id: string;
   custom_category: string | null;
+  location: string | null;
   plan_date: string;
   start_time: string;
   end_time: string;
