@@ -68,6 +68,11 @@ in the Supabase SQL editor. Admins can then write a definition for each category
 categories**, and everyone can read them from **Category definitions** in the sidebar. Until the
 migration is applied, the planner works as before and the definition fields are hidden.
 
+To allow plans that cross midnight (for example 11:45 PM to 12:15 AM), apply
+[`supabase/migrations/202610080001_overnight_plans.sql`](./supabase/migrations/202610080001_overnight_plans.sql)
+in the Supabase SQL editor. An end time earlier than the start time then means the plan ends on the
+following day.
+
 ## Planner behavior
 
 - Day and Monday-to-Sunday week views, with a date picker and previous/next navigation.
@@ -77,6 +82,7 @@ migration is applied, the planner works as before and the definition fields are 
 - Every plan is drawn at its scheduled start time with a height matching its duration. Overlapping plans sit side by side in lanes; when more than three overlap in a week or member column (six in the combined day view), the rest collapse into a **+N** chip that opens the day by member. Use hover or keyboard focus for full details, or tap a plan to open details on touch devices.
 - The day view shows one column per team member by default, with each member's plan count and planned hours in the header. Switch to **Combined** under **Display** to see all plans in a single column. Members can add plans only in their own column; admins can add plans in any real member's column.
 - Each member has a stable color and initials. Under **Display**, choose whether plans are colored by **Member** or **Category**; the other is still shown on the card.
+- A plan whose end time is earlier than its start time runs overnight and ends the next day (plans are shorter than 24 hours). The calendar shows it on both days, with dashed edges where it continues past midnight, and the plan form labels it **Ends next day**.
 - Members can create, edit, and delete their own plans; other members' plans are read-only.
 - Other members' plan notes are private; only the owner and admins can read them.
 - Plan locations are visible to the whole team.

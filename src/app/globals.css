@@ -1207,6 +1207,18 @@ textarea:focus-visible {
   }
 }
 
+.plan-block.continues-to {
+  border-bottom: 2px dashed color-mix(in srgb, currentColor 30%, transparent);
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.plan-block.continues-from {
+  border-top: 2px dashed color-mix(in srgb, currentColor 30%, transparent);
+  border-top-right-radius: 0;
+  border-top-left-radius: 0;
+}
+
 .plan-overflow {
   position: absolute;
   z-index: 2;
@@ -1661,6 +1673,237 @@ textarea:focus-visible {
 
 .dialog-spacer {
   flex: 1;
+}
+
+.plan-dialog {
+  position: relative;
+  width: min(100%, 500px);
+  padding: 30px 28px 22px;
+  border-color: #e3e8f0;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px #16244038, 0 4px 14px #16244014;
+}
+
+.plan-dialog::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 5px;
+  background: linear-gradient(90deg, var(--plan-accent), color-mix(in srgb, var(--plan-accent) 45%, #fff));
+}
+
+.plan-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.plan-dialog-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  color: var(--plan-accent);
+  background: color-mix(in srgb, var(--plan-accent) 13%, #fff);
+}
+
+.plan-dialog .dialog-header h2 {
+  margin-top: 3px;
+  color: #18243a;
+  font-weight: 650;
+}
+
+.plan-dialog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 16px 0 22px;
+}
+
+.plan-dialog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  color: #46546a;
+  background: #f1f4f9;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.plan-dialog-chip svg {
+  color: #7a8699;
+}
+
+.plan-dialog-chip strong {
+  color: #24334d;
+}
+
+.plan-dialog .plan-form {
+  gap: 18px;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #34425a;
+}
+
+.field-label svg {
+  flex: 0 0 auto;
+  color: #8592a8;
+}
+
+.plan-dialog .optional-label {
+  margin-left: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: #6b778c;
+  background: #eef1f6;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.plan-dialog .plan-form input,
+.plan-dialog .plan-form select,
+.plan-dialog .plan-form textarea {
+  min-height: 44px;
+  border-color: #d6deea;
+  border-radius: 10px;
+  background: #f8fafd;
+  transition: border-color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.plan-dialog .plan-form input::placeholder,
+.plan-dialog .plan-form textarea::placeholder {
+  color: #9aa5b8;
+}
+
+.plan-dialog .plan-form input:hover:not(:disabled),
+.plan-dialog .plan-form select:hover:not(:disabled),
+.plan-dialog .plan-form textarea:hover:not(:disabled) {
+  border-color: #b4c0d4;
+  background: #fff;
+}
+
+.plan-dialog .plan-form input:focus-visible,
+.plan-dialog .plan-form select:focus-visible,
+.plan-dialog .plan-form textarea:focus-visible {
+  border-color: var(--blue);
+  outline: none;
+  background: #fff;
+  box-shadow: 0 0 0 3px #3867f429;
+}
+
+.select-with-dot {
+  position: relative;
+  display: block;
+}
+
+.select-dot {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 13px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--plan-accent) 18%, transparent);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.plan-dialog .plan-form .select-with-dot select {
+  padding-left: 33px;
+}
+
+.plan-dialog .category-hint {
+  padding: 2px 0 2px 9px;
+  border-left: 2px solid var(--plan-accent);
+  color: #5b6880;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.time-panel {
+  padding: 13px 14px 11px;
+  border: 1px solid #e3e9f2;
+  border-radius: 13px;
+  background: #f9fbfe;
+}
+
+.plan-dialog .time-inputs {
+  grid-template-columns: 1fr 30px 1fr;
+}
+
+.plan-dialog .time-inputs input {
+  background: #fff;
+}
+
+.plan-dialog .time-separator {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  padding: 0;
+  color: #9aa5b8;
+}
+
+.time-duration {
+  margin: 10px 0 0;
+  color: #5b6880;
+  font-size: 12px;
+}
+
+.time-duration strong {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #1d2c47;
+  background: color-mix(in srgb, var(--plan-accent) 16%, #fff);
+  font-weight: 650;
+}
+
+.next-day-badge {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #5b3fa8;
+  background: #efe9fc;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.time-duration.invalid {
+  color: #b3261e;
+  font-weight: 550;
+}
+
+.plan-dialog .plan-notes-readonly p {
+  border-color: #e3e9f2;
+  border-radius: 10px;
+  background: #f8fafd;
+}
+
+.plan-dialog .dialog-actions {
+  margin-top: 4px;
+  padding-top: 18px;
+  border-top: 1px solid #edf0f5;
+}
+
+.plan-dialog .dialog-actions .button {
+  min-height: 42px;
+  border-radius: 10px;
+}
+
+.plan-dialog .dialog-actions .button-primary {
+  padding: 0 18px;
+  box-shadow: 0 4px 12px #3867f440;
 }
 
 .button-danger-outline {

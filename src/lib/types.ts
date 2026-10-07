@@ -40,4 +40,6 @@ export type PositionedPlan = Plan & {
   width: number;
   top: number;
   height: number;
+  continuesFrom: boolean;
+  continuesTo: boolean;
 };

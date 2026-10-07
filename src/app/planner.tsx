@@ -15,21 +15,31 @@ import {
   subMonths,
 } from "date-fns";
 import {
+  ArrowRight,
   BookOpen,
   CalendarCheck2,
+  CalendarDays,
+  CalendarPlus,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Eye,
   LogOut,
   MapPin,
   Minus,
+  PencilLine,
   Plus,
   RefreshCw,
   Search,
   Settings2,
   ShieldCheck,
+  StickyNote,
+  Tag,
   Trash2,
+  Type,
+  UserRound,
   UsersRound,
   X,
 } from "lucide-react";
@@ -72,11 +82,19 @@ type PlanOverflow = {
   height: number;
 };
 
+type PlanSegment = {
+  plan: Plan;
+  start: number;
+  end: number;
+  continuesFrom: boolean;
+  continuesTo: boolean;
+};
+
 type CalendarColumn = {
   key: string;
   day: Date;
   member: Profile | null;
-  plans: Plan[];
+  segments: PlanSegment[];
 };
 
 type PlanDraft = {
@@ -117,6 +135,33 @@ function formatTimeRange(start: string, end: string) {
     : `${startLabel}–${endLabel}`;
 }
 
+// An end time earlier than the start time means the plan ends on the following day.
+function isOvernight(start: string, end: string) {
+  return timeToMinutes(end) < timeToMinutes(start);
+}
+
+function getPlanMinutes(start: string, end: string) {
+  const minutes = timeToMinutes(end) - timeToMinutes(start);
+  return minutes < 0 ? minutes + 24 * 60 : minutes;
+}
+
+// Splits plans into the part that falls on dayKey: plans starting that day, plus the
+// after-midnight part of overnight plans that started the previous day.
+function getDaySegments(plans: Plan[], dayKey: string, previousDayKey: string): PlanSegment[] {
+  const segments: PlanSegment[] = [];
+  for (const plan of plans) {
+    const start = timeToMinutes(plan.start_time);
+    const end = timeToMinutes(plan.end_time);
+    const overnight = end < start;
+    if (plan.plan_date === dayKey) {
+      segments.push({ plan, start, end: overnight ? 24 * 60 : end, continuesFrom: false, continuesTo: overnight && end > 0 });
+    } else if (overnight && end > 0 && plan.plan_date === previousDayKey) {
+      segments.push({ plan, start: 0, end, continuesFrom: true, continuesTo: false });
+    }
+  }
+  return segments;
+}
+
 function formatDuration(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
@@ -133,12 +178,13 @@ function getInitials(name: string) {
 
 // Places plans at their scheduled time and size. Overlapping plans share the column
 // in side-by-side lanes; beyond maxLanes, the remaining plans collapse into an overflow chip.
-function layoutPlans(plans: Plan[], maxLanes: number) {
-  const items = plans
-    .map((plan) => {
-      const top = (timeToMinutes(plan.start_time) / 60) * HOUR_HEIGHT;
-      const bottom = Math.max((timeToMinutes(plan.end_time) / 60) * HOUR_HEIGHT, top + MIN_PLAN_HEIGHT);
-      return { plan, top, bottom, lane: 0 };
+function layoutPlans(segments: PlanSegment[], maxLanes: number) {
+  const items = segments
+    .map((segment) => {
+      const dayBottom = 24 * HOUR_HEIGHT;
+      const top = Math.min((segment.start / 60) * HOUR_HEIGHT, dayBottom - MIN_PLAN_HEIGHT);
+      const bottom = Math.min(Math.max((segment.end / 60) * HOUR_HEIGHT, top + MIN_PLAN_HEIGHT), dayBottom);
+      return { segment, plan: segment.plan, top, bottom, lane: 0 };
     })
     .sort((first, second) => first.top - second.top || second.bottom - first.bottom);
   const positioned: PositionedPlan[] = [];
@@ -173,6 +219,8 @@ function layoutPlans(plans: Plan[], maxLanes: number) {
       }
       positioned.push({
         ...item.plan,
+        continuesFrom: item.segment.continuesFrom,
+        continuesTo: item.segment.continuesTo,
         left: (item.lane / laneCount) * 100,
         width: (span / laneCount) * 100,
         top: item.top,
@@ -336,6 +384,8 @@ export default function Home() {
   }, [selectedDate, view]);
 
   const rangeStart = format(visibleDays[0], "yyyy-MM-dd");
+  // Overnight plans that start the day before the visible range still show after midnight.
+  const fetchStart = format(subDays(visibleDays[0], 1), "yyyy-MM-dd");
   const rangeEnd = format(visibleDays[visibleDays.length - 1], "yyyy-MM-dd");
   const isAdmin = profile?.role === "admin";
   const testProfile = profiles.find((member) => member.id === testProfileId && member.is_test) ?? null;
@@ -396,7 +446,7 @@ export default function Home() {
   useEffect(() => {
     if (!supabase || !session?.user.id) return;
     let mounted = true;
-    void fetchPlannerData(supabase, session.user.id, rangeStart, rangeEnd).then((result) => {
+    void fetchPlannerData(supabase, session.user.id, fetchStart, rangeEnd).then((result) => {
       if (!mounted) return;
       setDataLoading(false);
       if (result.data === null) {
@@ -418,11 +468,11 @@ export default function Home() {
     return () => {
       mounted = false;
     };
-  }, [rangeEnd, rangeStart, session?.user.id, supabase]);
+  }, [fetchStart, rangeEnd, session?.user.id, supabase]);
 
   async function refreshPlanner(client: SupabaseClient<Database>, currentUserId: string) {
     setDataLoading(true);
-    const result = await fetchPlannerData(client, currentUserId, rangeStart, rangeEnd);
+    const result = await fetchPlannerData(client, currentUserId, fetchStart, rangeEnd);
     setDataLoading(false);
     if (result.data === null) {
       setPageError(result.error);
@@ -598,8 +648,8 @@ export default function Home() {
       setPageError("Enter a location.");
       return;
     }
-    if (planDraft.end_time <= planDraft.start_time) {
-      setPageError("The end time must be later than the start time.");
+    if (planDraft.end_time === planDraft.start_time) {
+      setPageError("The start and end times can't be the same.");
       return;
     }
 
@@ -631,7 +681,11 @@ export default function Home() {
           .single();
 
     if (result.error) {
-      setPageError(result.error.message);
+      setPageError(
+        result.error.code === "23514" && isOvernight(planDraft.start_time, planDraft.end_time)
+          ? "Overnight plans need the 202610080001_overnight_plans.sql migration. Ask an admin to run it in Supabase."
+          : result.error.message,
+      );
       return;
     }
     setPlanDraft(null);
@@ -858,12 +912,16 @@ export default function Home() {
   );
   const visiblePlans = plans.filter((plan) => visibleCategoryIds?.has(plan.category_id) ?? true);
   const selectedDayKey = format(selectedDate, "yyyy-MM-dd");
-  const selectedDayPlans = visiblePlans.filter((plan) => plan.plan_date === selectedDayKey);
+  const selectedDaySegments = getDaySegments(
+    visiblePlans,
+    selectedDayKey,
+    format(subDays(selectedDate, 1), "yyyy-MM-dd"),
+  );
   const calendarMembers = profiles
     .filter((member) =>
       !member.is_test ||
       member.id === activeProfile?.id ||
-      selectedDayPlans.some((plan) => plan.created_by === member.id),
+      selectedDaySegments.some(({ plan }) => plan.created_by === member.id),
     )
     .sort((first, second) =>
       Number(second.id === activeProfile?.id) - Number(first.id === activeProfile?.id) ||
@@ -876,13 +934,13 @@ export default function Home() {
         key: member.id,
         day: selectedDate,
         member,
-        plans: selectedDayPlans.filter((plan) => plan.created_by === member.id),
+        segments: selectedDaySegments.filter(({ plan }) => plan.created_by === member.id),
       }))
     : visibleDays.map((day) => ({
         key: day.toISOString(),
         day,
         member: null,
-        plans: visiblePlans.filter((plan) => plan.plan_date === format(day, "yyyy-MM-dd")),
+        segments: getDaySegments(visiblePlans, format(day, "yyyy-MM-dd"), format(subDays(day, 1), "yyyy-MM-dd")),
       }));
   const maxLanes = view === "day" && !memberMode ? 6 : 3;
   const multiColumn = view === "week" || memberMode;
@@ -1253,9 +1311,9 @@ export default function Home() {
               <div className={`calendar-grid ${view === "day" ? "day-view" : "week-view"}${memberMode ? " member-view" : ""}${columnWidth ? " fixed-columns" : ""}`} style={{ "--hour-height": `${HOUR_HEIGHT}px`, "--day-count": calendarColumns.length, "--column-width": `${columnWidth ?? 0}px` } as React.CSSProperties}>
                 <div className="calendar-head">
                   <div className="timezone-head">GMT{new Date().getTimezoneOffset() <= 0 ? "+" : "−"}{String(Math.floor(Math.abs(new Date().getTimezoneOffset()) / 60)).padStart(2, "0")}:00</div>
-                  {memberMode ? calendarColumns.map(({ key, member, plans: memberPlans }) => {
+                  {memberMode ? calendarColumns.map(({ key, member, segments: memberPlans }) => {
                     const plannedMinutes = memberPlans.reduce(
-                      (total, plan) => total + timeToMinutes(plan.end_time) - timeToMinutes(plan.start_time),
+                      (total, segment) => total + segment.end - segment.start,
                       0,
                     );
                     return (
@@ -1293,8 +1351,8 @@ export default function Home() {
                       </div>
                     ))}
                   </div>
-                  {calendarColumns.map(({ key, day, member, plans: columnPlans }) => {
-                    const { positioned, overflows } = layoutPlans(columnPlans, maxLanes);
+                  {calendarColumns.map(({ key, day, member, segments: columnSegments }) => {
+                    const { positioned, overflows } = layoutPlans(columnSegments, maxLanes);
                     const canCreateHere = !member ||
                       member.id === activeProfile?.id ||
                       (canManage && !member.is_test);
@@ -1326,11 +1384,12 @@ export default function Home() {
                           const memberColor = memberColorById.get(plan.created_by) ?? "#9aa0a6";
                           const categoryColor = category?.color ?? "#9aa0a6";
                           const accentColor = colorBy === "member" ? memberColor : categoryColor;
-                          const duration = formatDuration(timeToMinutes(plan.end_time) - timeToMinutes(plan.start_time));
+                          const duration = formatDuration(getPlanMinutes(plan.start_time, plan.end_time));
+                          const nextDayNote = plan.continuesFrom ? " (continued from the previous day)" : plan.continuesTo ? " (continues the next day)" : "";
                           return (
                             <button
-                              className={`plan-block interactive${plan.height >= TALL_PLAN_HEIGHT ? " tall" : ""}${plan.height < 58 ? " compact" : ""}${plan.height < 40 ? " tiny" : ""}`}
-                              key={plan.id}
+                              className={`plan-block interactive${plan.height >= TALL_PLAN_HEIGHT ? " tall" : ""}${plan.height < 58 ? " compact" : ""}${plan.height < 40 ? " tiny" : ""}${plan.continuesFrom ? " continues-from" : ""}${plan.continuesTo ? " continues-to" : ""}`}
+                              key={`${plan.id}${plan.continuesFrom ? "-after-midnight" : ""}`}
                               style={{
                                 top: `${plan.top}px`,
                                 height: `${plan.height - 1}px`,
@@ -1345,7 +1404,7 @@ export default function Home() {
                               onMouseLeave={() => setPlanHoverCard(null)}
                               onFocus={(event) => showPlanHoverCard(plan, event.currentTarget)}
                               onBlur={() => setPlanHoverCard(null)}
-                              aria-label={`${plan.title}, ${categoryName}, ${ownerName}, ${formatTime(plan.start_time)} to ${formatTime(plan.end_time)}`}
+                              aria-label={`${plan.title}, ${categoryName}, ${ownerName}, ${formatTime(plan.start_time)} to ${formatTime(plan.end_time)}${nextDayNote}`}
                               aria-describedby={planHoverCard?.plan.id === plan.id ? "plan-hover-card" : undefined}
                             >
                               <span className="plan-title">{plan.title}</span>
@@ -1431,7 +1490,7 @@ export default function Home() {
             <span className="plan-hover-category">{plan.custom_category || category?.name || "Category"}</span>
             <div className="plan-hover-row">
               <Clock3 size={15} />
-              <span>{format(new Date(`${plan.plan_date}T00:00:00`), "EEE, MMM d")} · {formatTime(plan.start_time)} – {formatTime(plan.end_time)}</span>
+              <span>{format(new Date(`${plan.plan_date}T00:00:00`), "EEE, MMM d")} · {formatTime(plan.start_time)} – {formatTime(plan.end_time)}{isOvernight(plan.start_time, plan.end_time) ? " (next day)" : ""}</span>
             </div>
             <div className="plan-hover-row">
               <span className="plan-hover-avatar" style={{ color: "#fff", backgroundColor: memberColorById.get(plan.created_by) ?? "#9aa0a6" }}>
@@ -1452,24 +1511,41 @@ export default function Home() {
         );
       })()}
 
-      {planDraft && (
+      {planDraft && (() => {
+        const draftCategory = categoryById.get(planDraft.category_id);
+        const accentColor = draftCategory?.color ?? "#3867F4";
+        const draftMinutes = getPlanMinutes(planDraft.start_time, planDraft.end_time);
+        const draftOvernight = isOvernight(planDraft.start_time, planDraft.end_time);
+        const HeaderIcon = planDraft.readOnly ? Eye : planDraft.id ? PencilLine : CalendarPlus;
+        return (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) setPlanDraft(null);
         }}>
-          <section className="dialog" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title">
+          <section
+            className="dialog plan-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="plan-dialog-title"
+            style={{ "--plan-accent": accentColor } as React.CSSProperties}
+          >
             <div className="dialog-header">
-              <div>
-                <span className="eyebrow">{planDraft.readOnly ? "TEAM SCHEDULE" : planDraft.id ? "UPDATE YOUR SCHEDULE" : "ADD TO YOUR SCHEDULE"}</span>
-                <h2 id="plan-dialog-title">{planDraft.readOnly ? "Plan details" : planDraft.id ? "Edit plan" : "Create a plan"}</h2>
+              <div className="plan-dialog-title">
+                <span className="plan-dialog-icon"><HeaderIcon size={20} /></span>
+                <div>
+                  <span className="eyebrow">{planDraft.readOnly ? "TEAM SCHEDULE" : planDraft.id ? "UPDATE YOUR SCHEDULE" : "ADD TO YOUR SCHEDULE"}</span>
+                  <h2 id="plan-dialog-title">{planDraft.readOnly ? "Plan details" : planDraft.id ? "Edit plan" : "Create a plan"}</h2>
+                </div>
               </div>
               <button className="icon-button" aria-label="Close dialog" onClick={() => setPlanDraft(null)}><X size={20} /></button>
             </div>
-            <p className="dialog-date">{format(new Date(`${planDraft.plan_date}T00:00:00`), "EEEE, MMMM d, yyyy")}</p>
-            {planDraft.readOnly && <p className="plan-owner-row">Planned by <strong>{planDraft.ownerName}</strong></p>}
+            <div className="plan-dialog-meta">
+              <span className="plan-dialog-chip"><CalendarDays size={14} />{format(new Date(`${planDraft.plan_date}T00:00:00`), "EEEE, MMMM d, yyyy")}</span>
+              {planDraft.readOnly && <span className="plan-dialog-chip"><UserRound size={14} />Planned by <strong>{planDraft.ownerName}</strong></span>}
+            </div>
             <form className="plan-form" onSubmit={savePlan}>
               {!planDraft.id && canManage && (
                 <label>
-                  Create plan for
+                  <span className="field-label"><UserRound size={14} />Create plan for</span>
                   <select
                     value={planDraft.created_by ?? session.user.id}
                     onChange={(event) => setPlanDraft({ ...planDraft, created_by: event.target.value })}
@@ -1485,19 +1561,23 @@ export default function Home() {
                 </label>
               )}
               <label>
-                Plan name
+                <span className="field-label"><Type size={14} />Plan name</span>
                 <input autoFocus value={planDraft.title} onChange={(event) => setPlanDraft({ ...planDraft, title: event.target.value })} maxLength={100} required placeholder="e.g. Client visit" disabled={planDraft.readOnly} />
               </label>
               <label>
-                Category
-                <select value={planDraft.category_id} onChange={(event) => setPlanDraft({ ...planDraft, category_id: event.target.value, custom_category: "" })} required disabled={planDraft.readOnly}>
-                  {categories.filter((category) => category.active || category.id === planDraft.category_id).map((category) => <option value={category.id} key={category.id}>{category.name}{category.active ? "" : " (inactive)"}</option>)}
-                </select>
+                <span className="field-label"><Tag size={14} />Category</span>
+                <span className="select-with-dot">
+                  <span className="select-dot" style={{ backgroundColor: accentColor }} aria-hidden="true" />
+                  <select value={planDraft.category_id} onChange={(event) => setPlanDraft({ ...planDraft, category_id: event.target.value, custom_category: "" })} required disabled={planDraft.readOnly}>
+                    {categories.filter((category) => category.active || category.id === planDraft.category_id).map((category) => <option value={category.id} key={category.id}>{category.name}{category.active ? "" : " (inactive)"}</option>)}
+                  </select>
+                </span>
+                {draftCategory?.description && <small className="category-hint">{draftCategory.description}</small>}
                 {!planDraft.readOnly && activeCategories.length === 0 && <small>Ask an admin to add an active category.</small>}
               </label>
               {isOtherCategory && (
                 <label>
-                  Other category
+                  <span className="field-label"><Tag size={14} />Other category</span>
                   <input
                     value={planDraft.custom_category}
                     onChange={(event) => setPlanDraft({ ...planDraft, custom_category: event.target.value })}
@@ -1508,19 +1588,29 @@ export default function Home() {
                   />
                 </label>
               )}
-              <div className="time-inputs">
-                <label>Start time<input type="time" value={planDraft.start_time} onChange={(event) => setPlanDraft({ ...planDraft, start_time: event.target.value })} required disabled={planDraft.readOnly} /></label>
-                <span className="time-separator">to</span>
-                <label>End time<input type="time" value={planDraft.end_time} onChange={(event) => setPlanDraft({ ...planDraft, end_time: event.target.value })} required disabled={planDraft.readOnly} /></label>
+              <div className="time-panel">
+                <div className="time-inputs">
+                  <label><span className="field-label"><Clock3 size={14} />Start time</span><input type="time" value={planDraft.start_time} onChange={(event) => setPlanDraft({ ...planDraft, start_time: event.target.value })} required disabled={planDraft.readOnly} /></label>
+                  <span className="time-separator"><ArrowRight size={16} /></span>
+                  <label><span className="field-label"><Clock3 size={14} />End time</span><input type="time" value={planDraft.end_time} onChange={(event) => setPlanDraft({ ...planDraft, end_time: event.target.value })} required disabled={planDraft.readOnly} /></label>
+                </div>
+                <p className={`time-duration${draftMinutes > 0 ? "" : " invalid"}`}>
+                  {draftMinutes > 0 ? (
+                    <>
+                      Duration <strong>{formatDuration(draftMinutes)}</strong>
+                      {draftOvernight && <span className="next-day-badge">Ends next day</span>}
+                    </>
+                  ) : "The start and end times can't be the same"}
+                </p>
               </div>
               {planDraft.readOnly ? (
                 <div className="plan-notes-readonly">
-                  <span>Location</span>
+                  <span className="field-label"><MapPin size={14} />Location</span>
                   <p>{planDraft.location || "No location specified."}</p>
                 </div>
               ) : (
                 <label>
-                  Location
+                  <span className="field-label"><MapPin size={14} />Location</span>
                   <input
                     value={planDraft.location}
                     onChange={(event) => setPlanDraft({ ...planDraft, location: event.target.value })}
@@ -1532,12 +1622,12 @@ export default function Home() {
               )}
               {planDraft.readOnly ? (
                 <div className="plan-notes-readonly">
-                  <span>Notes</span>
+                  <span className="field-label"><StickyNote size={14} />Notes</span>
                   <p>{planDraft.details || "Notes are only visible to the plan owner and admins."}</p>
                 </div>
               ) : (
                 <label>
-                  Notes <span className="optional-label">Optional</span>
+                  <span className="field-label"><StickyNote size={14} />Notes <span className="optional-label">Optional</span></span>
                   <textarea value={planDraft.details} onChange={(event) => setPlanDraft({ ...planDraft, details: event.target.value })} maxLength={500} rows={3} placeholder="Add a little more detail" />
                 </label>
               )}
@@ -1545,12 +1635,13 @@ export default function Home() {
                 {planDraft.id && !planDraft.readOnly && <button className="button button-danger-outline" type="button" onClick={() => void deletePlan()}><Trash2 size={16} /> Delete</button>}
                 <span className="dialog-spacer" />
                 <button className="button button-outline" type="button" onClick={() => setPlanDraft(null)}>{planDraft.readOnly ? "Close" : "Cancel"}</button>
-                {!planDraft.readOnly && <button className="button button-primary" type="submit">{planDraft.id ? "Save changes" : "Save plan"}</button>}
+                {!planDraft.readOnly && <button className="button button-primary" type="submit"><Check size={16} />{planDraft.id ? "Save changes" : "Save plan"}</button>}
               </div>
             </form>
           </section>
         </div>
-      )}
+        );
+      })()}
 
       {categoryManagerOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
