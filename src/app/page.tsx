@@ -15,7 +15,7 @@ import {
   subMonths,
 } from "date-fns";
 import {
-  CalendarDays,
+  CalendarCheck2,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -439,7 +439,7 @@ export default function Home() {
     return (
       <main className="setup-screen">
         <div className="setup-card">
-          <div className="brand-mark"><CalendarDays size={23} /></div>
+          <div className="brand-mark"><CalendarCheck2 size={22} strokeWidth={2.1} /></div>
           <span className="eyebrow">TEAM PLANNER</span>
           <h1>Connect your workspace</h1>
           <p>
@@ -466,7 +466,10 @@ export default function Home() {
     return (
       <main className="auth-screen">
         <section className="auth-aside">
-          <div className="brand brand-light"><span className="brand-mark"><CalendarDays size={21} /></span> team planner</div>
+          <div className="brand brand-light">
+            <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
+            <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
+          </div>
           <div className="auth-pitch">
             <span className="eyebrow">A clearer day, together</span>
             <h1>Make time for<br />what matters.</h1>
@@ -481,7 +484,10 @@ export default function Home() {
         </section>
         <section className="auth-main">
           <div className="auth-card">
-            <div className="brand auth-mobile-brand"><span className="brand-mark"><CalendarDays size={21} /></span> team planner</div>
+            <div className="brand auth-mobile-brand">
+              <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
+              <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
+            </div>
             <span className="eyebrow">{authMode === "login" ? "WELCOME BACK" : "GET STARTED"}</span>
             <h2>{authMode === "login" ? "Sign in to your planner" : "Create your account"}</h2>
             <p className="auth-subtitle">
@@ -544,8 +550,8 @@ export default function Home() {
     <main className="planner-app">
       <header className="topbar">
         <div className="topbar-brand">
-          <span className="brand-mark"><CalendarDays size={20} /></span>
-          <span>team planner</span>
+          <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
+          <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
         </div>
         <div className="topbar-controls">
           <button className="button button-outline today-button" onClick={() => setSelectedDate(new Date())}>Today</button>

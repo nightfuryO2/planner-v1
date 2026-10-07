@@ -77,17 +77,49 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.topbar-brand .brand-mark {
+  width: 39px;
+  height: 39px;
+}
+
 .brand-mark {
-  width: 36px;
-  height: 36px;
+  width: 39px;
+  height: 39px;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  border: 1px solid #ffffff26;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #597cff, #315be4);
+  border: 1px solid #ffffff42;
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 27% 20%, #ffffff48, transparent 46%),
+    linear-gradient(145deg, #6787ff, #315be4 72%);
   color: #fff;
-  box-shadow: 0 5px 12px #0b173d50;
+  box-shadow: 0 6px 15px #0b173d55, inset 0 1px #ffffff36;
+  transition: border-radius 160ms ease, transform 160ms ease;
+}
+
+.brand:hover .brand-mark,
+.topbar-brand:hover .brand-mark {
+  border-radius: 15px;
+  transform: translateY(-1px);
+}
+
+.brand-name {
+  color: inherit;
+  font-size: inherit;
+  font-weight: 450;
+  letter-spacing: inherit;
+  white-space: nowrap;
+}
+
+.brand-name > span {
+  opacity: 0.78;
+}
+
+.brand-name strong {
+  color: inherit;
+  font-weight: 750;
+  letter-spacing: -0.65px;
 }
 
 .topbar-controls,
@@ -1089,7 +1121,8 @@ textarea:focus-visible {
 
 .brand-light {
   color: #fff;
-  font-size: 18px;
+  font-size: 20px;
+  letter-spacing: -0.55px;
 }
 
 .brand-light .brand-mark {
@@ -1400,8 +1433,8 @@ textarea:focus-visible {
   }
 
   .topbar-brand .brand-mark {
-    width: 33px;
-    height: 33px;
+    width: 37px;
+    height: 37px;
   }
 
   .topbar-controls {
@@ -1479,8 +1512,12 @@ textarea:focus-visible {
   }
 
   .topbar-brand .brand-mark {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .topbar-brand .brand-name {
+    font-size: 16px;
   }
 
   .topbar-controls {
@@ -1769,7 +1806,12 @@ textarea:focus-visible {
     display: flex;
     margin: 0 0 42px;
     color: #5f6368;
-    font-size: 18px;
+    font-size: 20px;
+  }
+
+  .auth-mobile-brand .brand-mark {
+    width: 39px;
+    height: 39px;
   }
 
   .auth-card h2 {
