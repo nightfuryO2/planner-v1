@@ -1228,13 +1228,6 @@ export default function Home() {
               <ChevronRight size={15} />
             </button>
           </div>
-          <div className="sidebar-tip">
-            <span className="tip-icon"><Plus size={16} /></span>
-            <div>
-              <strong>Quick add</strong>
-              <p>Select any time slot to start a plan.</p>
-            </div>
-          </div>
         </aside>
 
         <section className="calendar-panel" aria-label={`${view} calendar`}>
