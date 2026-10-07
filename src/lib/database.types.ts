@@ -12,19 +12,19 @@ export type Database = {
         {
           id: string;
           display_name: string;
-          role: "member" | "admin";
+          role: "boa" | "admin";
           created_at: string;
         },
         {
           id: string;
           display_name: string;
-          role?: "member" | "admin";
+          role?: "boa" | "admin";
           created_at?: string;
         },
         {
           id?: string;
           display_name?: string;
-          role?: "member" | "admin";
+          role?: "boa" | "admin";
           created_at?: string;
         }
       >;
@@ -106,6 +106,23 @@ export type Database = {
       };
     };
     Functions: {
+      admin_list_users: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          user_id: string;
+          email: string;
+          display_name: string;
+          role: "boa" | "admin";
+          joined_at: string;
+        }[];
+      };
+      admin_set_user_role: {
+        Args: {
+          target_user_id: string;
+          new_role: "boa" | "admin";
+        };
+        Returns: undefined;
+      };
       is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;

@@ -21,8 +21,11 @@ import {
   LogOut,
   Plus,
   RefreshCw,
+  Search,
   Settings2,
+  ShieldCheck,
   Trash2,
+  UsersRound,
   X,
 } from "lucide-react";
 import type { FormEvent } from "react";
@@ -30,7 +33,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
-import type { Category, Plan, PositionedPlan, Profile } from "@/lib/types";
+import type { Category, Plan, PositionedPlan, Profile, TeamUser } from "@/lib/types";
 
 const HOUR_HEIGHT = 64;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
@@ -176,6 +179,12 @@ export default function Home() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#4285F4");
   const [categoryBusy, setCategoryBusy] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+  const [teamUsersLoading, setTeamUsersLoading] = useState(false);
+  const [teamUsersError, setTeamUsersError] = useState("");
+  const [teamUserSearch, setTeamUserSearch] = useState("");
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const currentUserIdRef = useRef<string | null>(null);
 
   const visibleDays = useMemo(() => {
@@ -265,6 +274,54 @@ export default function Home() {
         : null,
     );
     setPlans(result.data.plans);
+  }
+
+  async function loadTeamUsers() {
+    if (!supabase || profile?.role !== "admin") return;
+    setTeamUsersLoading(true);
+    setTeamUsersError("");
+    try {
+      const { data, error } = await supabase.rpc("admin_list_users");
+      if (error) {
+        setTeamUsersError(error.message);
+      } else {
+        setTeamUsers(data);
+      }
+    } catch (error) {
+      setTeamUsersError(error instanceof Error ? error.message : "Unable to load team members.");
+    } finally {
+      setTeamUsersLoading(false);
+    }
+  }
+
+  async function updateTeamUserRole(user: TeamUser) {
+    if (!supabase || profile?.role !== "admin") return;
+    const newRole = user.role === "admin" ? "boa" : "admin";
+    setUpdatingUserId(user.user_id);
+    setTeamUsersError("");
+    try {
+      const { error } = await supabase.rpc("admin_set_user_role", {
+        target_user_id: user.user_id,
+        new_role: newRole,
+      });
+      if (error) {
+        setTeamUsersError(error.message);
+      } else if (user.user_id === session?.user.id) {
+        setProfile({ ...profile, role: newRole });
+        setShowAdminPanel(false);
+        setTeamUsers((current) =>
+          current.map((entry) => entry.user_id === user.user_id ? { ...entry, role: newRole } : entry),
+        );
+      } else {
+        setTeamUsers((current) =>
+          current.map((entry) => entry.user_id === user.user_id ? { ...entry, role: newRole } : entry),
+        );
+      }
+    } catch (error) {
+      setTeamUsersError(error instanceof Error ? error.message : "Unable to update this user's role.");
+    } finally {
+      setUpdatingUserId(null);
+    }
   }
 
   async function handleAuth(event: FormEvent<HTMLFormElement>) {
@@ -539,6 +596,13 @@ export default function Home() {
   const activeCategories = categories.filter((category) => category.active);
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   const profileById = new Map(profiles.map((member) => [member.id, member]));
+  const filteredTeamUsers = teamUsers.filter((user) => {
+    const query = teamUserSearch.trim().toLowerCase();
+    return !query ||
+      user.display_name.toLowerCase().includes(query) ||
+      user.email.toLowerCase().includes(query);
+  });
+  const adminCount = teamUsers.filter((user) => user.role === "admin").length;
   const calendarTitle =
     view === "day"
       ? format(selectedDate, "EEEE, MMMM d, yyyy")
@@ -554,25 +618,46 @@ export default function Home() {
           <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
         </div>
         <div className="topbar-controls">
-          <button className="button button-outline today-button" onClick={() => setSelectedDate(new Date())}>Today</button>
-          <div className="date-arrows">
-            <button className="icon-button" aria-label="Previous dates" onClick={() => moveDate(-1)}><ChevronLeft size={20} /></button>
-            <button className="icon-button" aria-label="Next dates" onClick={() => moveDate(1)}><ChevronRight size={20} /></button>
-          </div>
-          <h1 className="calendar-title">{calendarTitle}</h1>
+          {!showAdminPanel && (
+            <>
+              <button className="button button-outline today-button" onClick={() => setSelectedDate(new Date())}>Today</button>
+              <div className="date-arrows">
+                <button className="icon-button" aria-label="Previous dates" onClick={() => moveDate(-1)}><ChevronLeft size={20} /></button>
+                <button className="icon-button" aria-label="Next dates" onClick={() => moveDate(1)}><ChevronRight size={20} /></button>
+              </div>
+            </>
+          )}
+          <h1 className="calendar-title">{showAdminPanel ? "Team members" : calendarTitle}</h1>
         </div>
         <div className="topbar-actions">
-          <div className="view-switch" aria-label="Calendar view">
-            <button className={view === "day" ? "selected" : ""} onClick={() => setView("day")}>Day</button>
-            <button className={view === "week" ? "selected" : ""} onClick={() => setView("week")}>Week</button>
-          </div>
+          {isAdmin && (
+            <button
+              className={`admin-nav-button${showAdminPanel ? " selected" : ""}`}
+              onClick={() => {
+                const next = !showAdminPanel;
+                setShowAdminPanel(next);
+                if (next) void loadTeamUsers();
+              }}
+              aria-pressed={showAdminPanel}
+            >
+              <UsersRound size={17} />
+              <span>Team</span>
+            </button>
+          )}
+          {!showAdminPanel && (
+            <div className="view-switch" aria-label="Calendar view">
+              <button className={view === "day" ? "selected" : ""} onClick={() => setView("day")}>Day</button>
+              <button className={view === "week" ? "selected" : ""} onClick={() => setView("week")}>Week</button>
+            </div>
+          )}
           <button
             className="icon-button refresh-button"
-            aria-label="Refresh schedule"
-            title="Refresh schedule"
-            disabled={dataLoading}
+            aria-label={showAdminPanel ? "Refresh team members" : "Refresh schedule"}
+            title={showAdminPanel ? "Refresh team members" : "Refresh schedule"}
+            disabled={showAdminPanel ? teamUsersLoading : dataLoading}
             onClick={() => {
-              if (supabase) void refreshPlanner(supabase, session.user.id);
+              if (showAdminPanel) void loadTeamUsers();
+              else if (supabase) void refreshPlanner(supabase, session.user.id);
             }}
           >
             <RefreshCw size={17} />
@@ -586,14 +671,104 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="mobile-date-bar">
+      {!showAdminPanel && <div className="mobile-date-bar">
         <button className="icon-button" aria-label="Previous dates" onClick={() => moveDate(-1)}><ChevronLeft size={20} /></button>
         <strong>{calendarTitle}</strong>
         <button className="mobile-today" onClick={() => setSelectedDate(new Date())}>Today</button>
         <button className="icon-button" aria-label="Next dates" onClick={() => moveDate(1)}><ChevronRight size={20} /></button>
-      </div>
+      </div>}
 
       <div className="planner-body">
+        {showAdminPanel && isAdmin ? (
+          <section className="team-admin-panel" aria-labelledby="team-admin-title">
+            <div className="team-admin-heading">
+              <div className="team-admin-title-group">
+                <span className="team-admin-icon"><ShieldCheck size={22} /></span>
+                <div>
+                  <span className="eyebrow">ADMINISTRATION</span>
+                  <h1 id="team-admin-title">Team members</h1>
+                  <p>Manage access to your team&apos;s planner.</p>
+                </div>
+              </div>
+              <div className="team-summary">
+                <span><strong>{teamUsers.length}</strong> members</span>
+                <span><strong>{adminCount}</strong> admins</span>
+              </div>
+            </div>
+
+            <div className="team-admin-toolbar">
+              <label className="team-search">
+                <Search size={17} />
+                <input
+                  type="search"
+                  value={teamUserSearch}
+                  onChange={(event) => setTeamUserSearch(event.target.value)}
+                  placeholder="Search by name or email"
+                  aria-label="Search team members"
+                />
+              </label>
+              <p>BOA members manage their own plans. Admins can manage the whole planner.</p>
+            </div>
+
+            {teamUsersError && <div className="team-admin-error" role="alert">{teamUsersError}</div>}
+            <div className="team-user-list" aria-live="polite">
+              <div className="team-user-list-head">
+                <span>Member</span>
+                <span>Access</span>
+                <span>Joined</span>
+                <span>Manage access</span>
+              </div>
+              {teamUsersLoading ? (
+                <div className="team-user-empty"><span className="spinner" /> Loading team members</div>
+              ) : filteredTeamUsers.length === 0 ? (
+                <div className="team-user-empty">
+                  {teamUsers.length === 0 ? "No team members found." : "No members match your search."}
+                </div>
+              ) : (
+                filteredTeamUsers.map((user) => (
+                  <article className="team-user-row" key={user.user_id}>
+                    <div className="team-user-identity">
+                      <span className={`team-user-avatar${user.role === "admin" ? " admin-avatar" : ""}`}>
+                        {user.display_name.slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="team-user-names">
+                        <strong>{user.display_name}{user.user_id === session.user.id && <em>You</em>}</strong>
+                        <span>{user.email}</span>
+                      </span>
+                    </div>
+                    <span className={`team-role-badge ${user.role}`}>
+                      {user.role === "admin" && <ShieldCheck size={13} />}
+                      {user.role === "admin" ? "Admin" : "BOA"}
+                    </span>
+                    <time className="team-user-joined" dateTime={user.joined_at}>
+                      {format(new Date(user.joined_at), "MMM d, yyyy")}
+                    </time>
+                    <div className="team-user-action">
+                      {user.role === "admin" && adminCount <= 1 ? (
+                        <span className="last-admin-note">Last admin</span>
+                      ) : (
+                        <button
+                          className={`button ${user.role === "admin" ? "button-outline" : "button-promote"}`}
+                          disabled={updatingUserId !== null}
+                          onClick={() => void updateTeamUserRole(user)}
+                        >
+                          {updatingUserId === user.user_id
+                            ? "Updating..."
+                            : user.role === "admin" ? "Make BOA" : "Make admin"}
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+            <div className="team-admin-footnote">
+              <ShieldCheck size={15} />
+              <span>Role changes take effect immediately and are enforced by the database.</span>
+            </div>
+          </section>
+        ) : (
+          <>
         <aside className="sidebar">
           <button className="button button-create" onClick={() => openNewPlan()}><Plus size={19} /> Create plan</button>
           <div className="mini-calendar">
@@ -758,6 +933,8 @@ export default function Home() {
             <button className="button button-create" onClick={() => openNewPlan()}><Plus size={20} /> Create plan</button>
           </div>
         </section>
+          </>
+        )}
       </div>
 
       {planDraft && (

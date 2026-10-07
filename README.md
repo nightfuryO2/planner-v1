@@ -21,23 +21,29 @@ database-enforced permissions.
 Without the Supabase environment variables, the app displays setup instructions instead of
 pretending that sign-in or data storage is available.
 
-## Roles
+## Roles and team access
 
-New sign-ups receive the `member` role. To promote an account, first have that person sign up,
-then run this query in the Supabase SQL editor, replacing the email address:
+After the initial schema has been installed, run
+[`supabase/migrations/202610070001_boa_roles_and_admin_user_management.sql`](./supabase/migrations/202610070001_boa_roles_and_admin_user_management.sql)
+in the Supabase SQL editor. Existing members are migrated to the `boa` role, which is also the
+default for new sign-ups. BOA users can view the team schedule and create, edit, or delete only
+their own plans.
+
+To bootstrap the first admin, have the account sign up first, then run this query in the Supabase
+SQL editor, replacing the email address:
 
 ```sql
 update public.profiles
 set role = 'admin'
 where id = (
-  select id from auth.users where email = 'admin@example.com'
+  select id from auth.users where lower(email) = lower('admin@example.com')
 );
 ```
 
-Role changes are intentionally not available to members through the website. Row-level security
-allows signed-in members to read all plans, but only their own plans can be inserted, updated, or
-deleted. Admins can manage every plan and administer category names and colors. Profile role
-updates are restricted to the Supabase database administrator.
+Once promoted, admins can open **Team** in the planner to search registered users and promote
+BOA users to admins or demote other admins to BOA. The final admin cannot be demoted. Role
+management is enforced by admin-only Postgres functions; ordinary users cannot update role values
+directly. Admins can manage every plan and administer category names and colors.
 
 ## Planner behavior
 

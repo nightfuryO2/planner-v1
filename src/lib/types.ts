@@ -1,7 +1,15 @@
 export type Profile = {
   id: string;
   display_name: string;
-  role: "member" | "admin";
+  role: "boa" | "admin";
+};
+
+export type TeamUser = {
+  user_id: string;
+  email: string;
+  display_name: string;
+  role: "boa" | "admin";
+  joined_at: string;
 };
 
 export type Category = {
