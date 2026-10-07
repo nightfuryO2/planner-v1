@@ -730,6 +730,11 @@ textarea:focus-visible {
   transform: translateY(-6px);
 }
 
+.hour-label:first-child {
+  padding-top: 4px;
+  transform: none;
+}
+
 .day-column {
   position: relative;
   height: calc(24 * var(--hour-height));
