@@ -1993,6 +1993,11 @@ textarea:focus-visible {
   gap: 16px;
 }
 
+.team-user-list:not(.admin-user-list) .team-user-list-head,
+.team-user-list:not(.admin-user-list) .team-user-row {
+  grid-template-columns: minmax(240px, 1.7fr) minmax(105px, 0.55fr) minmax(115px, 0.65fr);
+}
+
 .team-user-list-head {
   min-height: 41px;
   padding: 0 17px;

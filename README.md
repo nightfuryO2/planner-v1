@@ -48,6 +48,7 @@ directly. Admins can manage every plan and administer category names and colors.
 ## Planner behavior
 
 - Day and Monday-to-Sunday week views, with a date picker and previous/next navigation.
+- `/` is the planner home; `/team` is the signed-in team directory. BOA users can view names and roles, while admins can also manage user roles.
 - Schedules use the selected day and the browser's local time.
 - Refresh the schedule after another member adds or changes a plan.
 - Members can create, edit, and delete their own plans; other members' plans are read-only.

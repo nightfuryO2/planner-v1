@@ -2,6 +2,7 @@ export type Profile = {
   id: string;
   display_name: string;
   role: "boa" | "admin";
+  created_at?: string;
 };
 
 export type TeamUser = {

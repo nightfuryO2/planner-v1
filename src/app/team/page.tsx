@@ -1,5 +1,5 @@
 import Planner from "@/app/planner";
 
-export default function HomePage() {
+export default function TeamPage() {
   return <Planner />;
 }
