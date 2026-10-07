@@ -28,6 +28,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -44,8 +45,10 @@ type PlanDraft = {
   title: string;
   details: string;
   category_id: string;
+  plan_date: string;
   start_time: string;
   end_time: string;
+  created_by?: string;
   readOnly?: boolean;
   ownerName?: string;
 };
@@ -379,7 +382,7 @@ export default function Home() {
     if (error) setPageError(error.message);
   }
 
-  function openNewPlan(startTime = "09:00") {
+  function openNewPlan(startTime = "09:00", planDate = selectedDate) {
     const startMinutes = Math.floor(timeToMinutes(startTime) / 30) * 30;
     const start = `${String(Math.floor(startMinutes / 60)).padStart(2, "0")}:${String(startMinutes % 60).padStart(2, "0")}`;
     const endMinutes = Math.min(startMinutes + 60, 23 * 60 + 30);
@@ -388,8 +391,10 @@ export default function Home() {
       title: "",
       details: "",
       category_id: categories.find((category) => category.active)?.id ?? "",
+      plan_date: format(planDate, "yyyy-MM-dd"),
       start_time: start,
       end_time: end,
+      created_by: session?.user.id,
     });
   }
 
@@ -401,6 +406,7 @@ export default function Home() {
       title: plan.title,
       details: plan.details ?? "",
       category_id: plan.category_id,
+      plan_date: plan.plan_date,
       start_time: plan.start_time.slice(0, 5),
       end_time: plan.end_time.slice(0, 5),
       readOnly: !canEdit,
@@ -422,7 +428,7 @@ export default function Home() {
       title: planDraft.title.trim(),
       details: planDraft.details.trim() || null,
       category_id: planDraft.category_id,
-      plan_date: format(selectedDate, "yyyy-MM-dd"),
+      plan_date: planDraft.plan_date,
       start_time: planDraft.start_time,
       end_time: planDraft.end_time,
     };
@@ -431,7 +437,7 @@ export default function Home() {
       ? await supabase.from("plans").update(values).eq("id", planDraft.id).select("id").single()
       : await supabase
           .from("plans")
-          .insert({ ...values, created_by: session.user.id })
+          .insert({ ...values, created_by: isAdmin ? planDraft.created_by ?? session.user.id : session.user.id })
           .select("id")
           .single();
 
@@ -547,10 +553,10 @@ export default function Home() {
     return (
       <main className="auth-screen">
         <section className="auth-aside">
-          <div className="brand brand-light">
+          <Link className="brand brand-light" href="/" aria-label="Team Planner home">
             <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
             <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
-          </div>
+          </Link>
           <div className="auth-pitch">
             <span className="eyebrow">A clearer day, together</span>
             <h1>Make time for<br />what matters.</h1>
@@ -565,10 +571,10 @@ export default function Home() {
         </section>
         <section className="auth-main">
           <div className="auth-card">
-            <div className="brand auth-mobile-brand">
+            <Link className="brand auth-mobile-brand" href="/" aria-label="Team Planner home">
               <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
               <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
-            </div>
+            </Link>
             <span className="eyebrow">{authMode === "login" ? "WELCOME BACK" : "GET STARTED"}</span>
             <h2>{authMode === "login" ? "Sign in to your planner" : "Create your account"}</h2>
             <p className="auth-subtitle">
@@ -637,10 +643,10 @@ export default function Home() {
   return (
     <main className="planner-app">
       <header className="topbar">
-        <div className="topbar-brand">
+        <Link className="topbar-brand" href="/" aria-label="Team Planner home">
           <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
           <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
-        </div>
+        </Link>
         <div className="topbar-controls">
           {!showTeamPage && (
             <>
@@ -798,7 +804,7 @@ export default function Home() {
               </div>
             </div>
             <div className="mini-grid mini-weekdays">
-              {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}
+              {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => <span className={index === 6 ? "sunday-weekday" : ""} key={`${day}-${index}`}>{day}</span>)}
             </div>
             <div className="mini-grid">
               {eachDayOfInterval({
@@ -807,7 +813,7 @@ export default function Home() {
               }).map((day) => (
                 <button
                   key={day.toISOString()}
-                  className={`mini-day${isSameDay(day, selectedDate) ? " selected" : ""}${!isSameMonth(day, selectedDate) ? " muted" : ""}${isSameDay(day, new Date()) ? " today" : ""}`}
+                  className={`mini-day${isSameDay(day, selectedDate) ? " selected" : ""}${!isSameMonth(day, selectedDate) ? " muted" : ""}${isSameDay(day, new Date()) ? " today" : ""}${day.getDay() === 0 ? " sunday" : ""}`}
                   onClick={() => setSelectedDate(day)}
                 >
                   {format(day, "d")}
@@ -872,7 +878,7 @@ export default function Home() {
                   <div className="timezone-head">GMT{new Date().getTimezoneOffset() <= 0 ? "+" : "−"}{String(Math.floor(Math.abs(new Date().getTimezoneOffset()) / 60)).padStart(2, "0")}:00</div>
                   {visibleDays.map((day) => (
                     <button
-                      className={`day-head${isSameDay(day, new Date()) ? " current-day" : ""}`}
+                      className={`day-head${isSameDay(day, new Date()) ? " current-day" : ""}${day.getDay() === 0 ? " sunday" : ""}`}
                       key={day.toISOString()}
                       onClick={() => {
                         setSelectedDate(day);
@@ -896,7 +902,7 @@ export default function Home() {
                       ),
                     );
                     return (
-                      <div className={`day-column${isSameDay(day, new Date()) ? " current-day-column" : ""}`} key={day.toISOString()}>
+                      <div className={`day-column${isSameDay(day, new Date()) ? " current-day-column" : ""}${day.getDay() === 0 ? " sunday-column" : ""}`} key={day.toISOString()}>
                         {HOURS.map((hour) => (
                           <button
                             className="hour-cell"
@@ -905,7 +911,7 @@ export default function Home() {
                             onClick={() => {
                               setSelectedDate(day);
                               setView("day");
-                              openNewPlan(`${String(hour).padStart(2, "0")}:00`);
+                              openNewPlan(`${String(hour).padStart(2, "0")}:00`, day);
                             }}
                           />
                         ))}
@@ -967,9 +973,26 @@ export default function Home() {
               </div>
               <button className="icon-button" aria-label="Close dialog" onClick={() => setPlanDraft(null)}><X size={20} /></button>
             </div>
-            <p className="dialog-date">{format(selectedDate, "EEEE, MMMM d, yyyy")}</p>
+            <p className="dialog-date">{format(new Date(`${planDraft.plan_date}T00:00:00`), "EEEE, MMMM d, yyyy")}</p>
             {planDraft.readOnly && <p className="plan-owner-row">Planned by <strong>{planDraft.ownerName}</strong></p>}
             <form className="plan-form" onSubmit={savePlan}>
+              {!planDraft.id && isAdmin && (
+                <label>
+                  Create plan for
+                  <select
+                    value={planDraft.created_by ?? session.user.id}
+                    onChange={(event) => setPlanDraft({ ...planDraft, created_by: event.target.value })}
+                    required
+                  >
+                    {profiles.map((member) => (
+                      <option key={member.id} value={member.id}>
+                        {member.id === session.user.id ? `${member.display_name} (you)` : member.display_name}
+                      </option>
+                    ))}
+                  </select>
+                  <small>The selected member will own this plan and can edit it.</small>
+                </label>
+              )}
               <label>
                 Plan name
                 <input autoFocus value={planDraft.title} onChange={(event) => setPlanDraft({ ...planDraft, title: event.target.value })} maxLength={100} required placeholder="e.g. Client visit" disabled={planDraft.readOnly} />

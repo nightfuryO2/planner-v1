@@ -45,6 +45,11 @@ BOA users to admins or demote other admins to BOA. The final admin cannot be dem
 management is enforced by admin-only Postgres functions; ordinary users cannot update role values
 directly. Admins can manage every plan and administer category names and colors.
 
+To let admins create a plan on behalf of a member, apply
+[`supabase/migrations/202610070002_admin_create_member_plans.sql`](./supabase/migrations/202610070002_admin_create_member_plans.sql)
+in the Supabase SQL editor. Admin-created plans are owned by the selected member, who can manage
+that plan like their own.
+
 ## Planner behavior
 
 - Day and Monday-to-Sunday week views, with a date picker and previous/next navigation.

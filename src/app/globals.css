@@ -77,6 +77,16 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.topbar-brand {
+  text-decoration: none;
+}
+
+.topbar-brand:focus-visible {
+  outline: 2px solid #aabfff;
+  outline-offset: 5px;
+  border-radius: 8px;
+}
+
 .topbar-brand .brand-mark {
   width: 39px;
   height: 39px;
@@ -403,6 +413,10 @@ textarea:focus-visible {
   font-weight: 600;
 }
 
+.mini-weekdays span.sunday-weekday {
+  color: #7952a5;
+}
+
 .mini-day {
   width: 27px;
   height: 27px;
@@ -429,11 +443,36 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
+.mini-day.sunday:not(.selected) {
+  color: #7952a5;
+}
+
+.mini-day.sunday.muted:not(.selected) {
+  color: #b4a5c3;
+}
+
 .mini-day.selected,
 .mini-day.selected:hover {
   color: #fff;
   background: var(--blue);
   font-weight: 700;
+}
+
+.mini-day.today:not(.selected) {
+  border: 2px solid #3867f4;
+  color: #3159dc;
+  font-weight: 750;
+}
+
+.mini-day.today.selected {
+  outline: 2px solid #3159dc;
+  outline-offset: 2px;
+}
+
+.mini-day.sunday.today:not(.selected) {
+  border-color: #3867f4;
+  color: #7142a2;
+  background: #f5f0fc;
 }
 
 .sidebar-section {
@@ -617,6 +656,20 @@ textarea:focus-visible {
   cursor: pointer;
 }
 
+.day-head.sunday {
+  border-left-color: #e7dff0;
+  background: #faf7fd;
+}
+
+.day-head.sunday > span {
+  color: #7952a5;
+}
+
+.day-head.sunday > b {
+  border: 1px solid #e5d8f0;
+  color: #704797;
+}
+
 .day-head > span {
   color: #72809a;
   font-size: 11px;
@@ -642,6 +695,12 @@ textarea:focus-visible {
 
 .day-head.current-day > span {
   color: #3159dc;
+}
+
+.day-head.current-day > b {
+  border: 2px solid #254ac7;
+  outline: 2px solid #9db2ff;
+  outline-offset: 2px;
 }
 
 .day-head.current-day > b {
@@ -686,6 +745,24 @@ textarea:focus-visible {
 
 .day-column.current-day-column {
   background-color: #f7f9ff;
+  box-shadow: inset 2px 0 #9db2ff, inset -2px 0 #9db2ff;
+}
+
+.day-column.sunday-column {
+  border-left-color: #e5d9ef;
+  background-color: #fcf9ff;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(var(--hour-height) - 1px),
+    #e9e1f0 calc(var(--hour-height) - 1px),
+    #e9e1f0 var(--hour-height)
+  );
+}
+
+.day-column.current-day-column.sunday-column {
+  background-color: #f7f2ff;
+  box-shadow: inset 2px 0 #8a65c4, inset -2px 0 #8a65c4;
 }
 
 .hour-cell {
@@ -899,6 +976,10 @@ textarea:focus-visible {
   color: #3c4043;
   font-size: 12px;
   font-weight: 600;
+}
+
+.plan-form select {
+  cursor: pointer;
 }
 
 .plan-form input,
