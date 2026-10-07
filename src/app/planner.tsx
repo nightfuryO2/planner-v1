@@ -21,6 +21,7 @@ import {
   Clock3,
   LogOut,
   MapPin,
+  Minus,
   Plus,
   RefreshCw,
   Search,
@@ -41,6 +42,9 @@ import type { Category, Plan, PositionedPlan, Profile, TeamUser } from "@/lib/ty
 
 const HOUR_HEIGHT = 64;
 const MIN_PLAN_HEIGHT = 22;
+const TALL_PLAN_HEIGHT = 96;
+const COLUMN_WIDTHS = [null, 200, 260, 340, 440] as const;
+const COLUMN_WIDTH_STORAGE_KEY = "planner-column-width";
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const MEMBER_COLORS = [
   "#3867F4",
@@ -101,6 +105,14 @@ function formatTime(value: string) {
   const suffix = hour >= 12 ? "PM" : "AM";
   const displayHour = hour % 12 || 12;
   return minute === 0 ? `${displayHour} ${suffix}` : `${displayHour}:${minuteString} ${suffix}`;
+}
+
+function formatTimeRange(start: string, end: string) {
+  const startLabel = formatTime(start);
+  const endLabel = formatTime(end);
+  return startLabel.slice(-2) === endLabel.slice(-2)
+    ? `${startLabel.slice(0, -3)}–${endLabel}`
+    : `${startLabel}–${endLabel}`;
 }
 
 function formatDuration(minutes: number) {
@@ -274,6 +286,14 @@ export default function Home() {
   const [view, setView] = useState<"day" | "week">("week");
   const [dayLayout, setDayLayout] = useState<"members" | "combined">("members");
   const [colorBy, setColorBy] = useState<"member" | "category">("member");
+  const [columnWidthLevel, setColumnWidthLevel] = useState(() => {
+    try {
+      const stored = Number(window.localStorage.getItem(COLUMN_WIDTH_STORAGE_KEY));
+      return Number.isInteger(stored) && stored > 0 && stored < COLUMN_WIDTHS.length ? stored : 0;
+    } catch {
+      return 0;
+    }
+  });
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
   const [planHoverCard, setPlanHoverCard] = useState<PlanHoverCard | null>(null);
   const [testProfileId, setTestProfileId] = useState("");
@@ -643,6 +663,16 @@ export default function Home() {
     });
   }
 
+  function changeColumnWidth(direction: -1 | 1) {
+    const next = Math.min(Math.max(columnWidthLevel + direction, 0), COLUMN_WIDTHS.length - 1);
+    setColumnWidthLevel(next);
+    try {
+      window.localStorage.setItem(COLUMN_WIDTH_STORAGE_KEY, String(next));
+    } catch {
+      // The width preference is a convenience; the calendar works without storage.
+    }
+  }
+
   function toggleCategory(categoryId: string) {
     setVisibleCategoryIds((current) => {
       const next = new Set(current ?? categories.map(({ id }) => id));
@@ -793,6 +823,8 @@ export default function Home() {
         plans: visiblePlans.filter((plan) => plan.plan_date === format(day, "yyyy-MM-dd")),
       }));
   const maxLanes = view === "day" && !memberMode ? 6 : 3;
+  const multiColumn = view === "week" || memberMode;
+  const columnWidth = multiColumn ? COLUMN_WIDTHS[columnWidthLevel] : null;
   const filteredTeamUsers = teamUsers.filter((user) => {
     const query = teamUserSearch.trim().toLowerCase();
     return !query ||
@@ -1025,6 +1057,32 @@ export default function Home() {
                 <button className={colorBy === "category" ? "selected" : ""} aria-pressed={colorBy === "category"} onClick={() => setColorBy("category")}>Category</button>
               </div>
             </div>
+            {multiColumn && (
+              <div className="display-option">
+                <span>Column width</span>
+                <div className="width-stepper" role="group" aria-label="Column width">
+                  <button
+                    className="icon-button small-icon"
+                    aria-label="Narrower columns"
+                    title="Narrower columns"
+                    disabled={columnWidthLevel === 0}
+                    onClick={() => changeColumnWidth(-1)}
+                  >
+                    <Minus size={15} />
+                  </button>
+                  <output aria-live="polite">{columnWidth ? `${columnWidth}px` : "Fit to screen"}</output>
+                  <button
+                    className="icon-button small-icon"
+                    aria-label="Wider columns"
+                    title="Wider columns"
+                    disabled={columnWidthLevel === COLUMN_WIDTHS.length - 1}
+                    onClick={() => changeColumnWidth(1)}
+                  >
+                    <Plus size={15} />
+                  </button>
+                </div>
+              </div>
+            )}
             {view === "day" && (
               <div className="display-option">
                 <span>Day layout</span>
@@ -1104,7 +1162,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="calendar-scroll">
-              <div className={`calendar-grid ${view === "day" ? "day-view" : "week-view"}${memberMode ? " member-view" : ""}`} style={{ "--hour-height": `${HOUR_HEIGHT}px`, "--day-count": calendarColumns.length } as React.CSSProperties}>
+              <div className={`calendar-grid ${view === "day" ? "day-view" : "week-view"}${memberMode ? " member-view" : ""}${columnWidth ? " fixed-columns" : ""}`} style={{ "--hour-height": `${HOUR_HEIGHT}px`, "--day-count": calendarColumns.length, "--column-width": `${columnWidth ?? 0}px` } as React.CSSProperties}>
                 <div className="calendar-head">
                   <div className="timezone-head">GMT{new Date().getTimezoneOffset() <= 0 ? "+" : "−"}{String(Math.floor(Math.abs(new Date().getTimezoneOffset()) / 60)).padStart(2, "0")}:00</div>
                   {memberMode ? calendarColumns.map(({ key, member, plans: memberPlans }) => {
@@ -1183,7 +1241,7 @@ export default function Home() {
                           const duration = formatDuration(timeToMinutes(plan.end_time) - timeToMinutes(plan.start_time));
                           return (
                             <button
-                              className={`plan-block interactive${plan.height < 58 ? " compact" : ""}${plan.height < 40 ? " tiny" : ""}`}
+                              className={`plan-block interactive${plan.height >= TALL_PLAN_HEIGHT ? " tall" : ""}${plan.height < 58 ? " compact" : ""}${plan.height < 40 ? " tiny" : ""}`}
                               key={plan.id}
                               style={{
                                 top: `${plan.top}px`,
@@ -1203,7 +1261,7 @@ export default function Home() {
                               aria-describedby={planHoverCard?.plan.id === plan.id ? "plan-hover-card" : undefined}
                             >
                               <span className="plan-title">{plan.title}</span>
-                              <span className="plan-time">{formatTime(plan.start_time)} – {formatTime(plan.end_time)} · {duration}</span>
+                              <span className="plan-time">{formatTimeRange(plan.start_time, plan.end_time)}<span className="plan-duration"> · {duration}</span></span>
                               <span className="plan-identifiers">
                                 <span className="plan-owner">
                                   <span className="plan-owner-initial" style={{ backgroundColor: memberColor }}>{getInitials(owner?.display_name ?? ownerName)}</span>
