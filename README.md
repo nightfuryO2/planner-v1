@@ -88,7 +88,8 @@ in the Supabase SQL editor. It gives each category a type (**Working**, **Comp o
 - **Taken:** each date with a Comp off-type plan uses 1.
 - **Pending** is everything earned minus everything taken. Comp offs never expire, so unused ones carry
   into the next month; a negative balance means a comp off was taken before the Sunday or holiday it's for.
-- Overnight plans count on both dates they touch. Test profiles are not included.
+- Overnight work plans count on both dates they touch, so a Saturday night shift into Sunday earns a
+  comp off. A comp off plan counts only on the date it starts. Test profiles are not included.
 - Select a member to see the dates behind their numbers.
 
 ## Planner behavior

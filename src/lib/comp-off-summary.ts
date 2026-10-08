@@ -43,7 +43,7 @@ function getPlanDates(plan: CompOffPlan) {
  *
  * - Earned: each Sunday or holiday (a date with a holiday-type plan) on which the member has a
  *   working-type plan earns 1.
- * - Taken: each date with a comp-off-type plan uses 1.
+ * - Taken: each date with a comp-off-type plan uses 1, counted on the date the plan starts.
  * - Comp offs never expire: carriedIn is the balance from everything before the month, and
  *   pending is the balance at the end of the month. It can be negative when a comp off is taken
  *   before the Sunday or holiday it is for.
@@ -68,7 +68,9 @@ export function summarizeCompOffs(
       days = new Map();
       activityByMember.set(plan.created_by, days);
     }
-    for (const date of getPlanDates(plan)) {
+    // A comp off counts once, on the date it starts, even if it runs past midnight.
+    const dates = kind === "comp_off" ? [plan.plan_date] : getPlanDates(plan);
+    for (const date of dates) {
       if (date > monthEnd) continue;
       let day = days.get(date);
       if (!day) {
