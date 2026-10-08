@@ -78,7 +78,9 @@ following day.
 - Day and Monday-to-Sunday week views, with a date picker and previous/next navigation.
 - `/` is the planner home; `/team` is the signed-in team directory. BOA users can view names and roles, while admins can also manage user roles.
 - Schedules use the selected day and the browser's local time.
-- Refresh the schedule after another member adds or changes a plan.
+- Open planners update automatically when anyone saves, deletes, or recategorizes a plan, and reload when you return to the tab. The refresh button is still available on larger screens.
+- The account menu (your avatar) holds the admin **View planner as** preview, the theme (**System**, **Light**, or **Dark**), and **Sign out**.
+- Days with plans show a dot in the sidebar's month calendar. Press **Escape** to close any open dialog or menu.
 - Every plan is drawn at its scheduled start time with a height matching its duration. Overlapping plans sit side by side in lanes; when more than three overlap in a week or member column (six in the combined day view), the rest collapse into a **+N** chip that opens the day by member. Use hover or keyboard focus for full details, or tap a plan to open details on touch devices.
 - The day view shows one column per team member by default, with each member's plan count and planned hours in the header. Switch to **Combined** under **Display** to see all plans in a single column. Members can add plans only in their own column; admins can add plans in any real member's column.
 - Each member has a stable color and initials. Under **Display**, choose whether plans are colored by **Member** or **Category**; the other is still shown on the card.

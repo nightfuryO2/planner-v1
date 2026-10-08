@@ -29,6 +29,8 @@ import {
   LogOut,
   MapPin,
   Minus,
+  Monitor,
+  Moon,
   PencilLine,
   Plus,
   RefreshCw,
@@ -36,6 +38,7 @@ import {
   Settings2,
   ShieldCheck,
   StickyNote,
+  Sun,
   Tag,
   Trash2,
   Type,
@@ -47,7 +50,7 @@ import Link from "next/link";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import type { Session, SupabaseClient } from "@supabase/supabase-js";
+import type { RealtimeChannel, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
 import type { Category, Plan, PositionedPlan, Profile, TeamUser } from "@/lib/types";
@@ -57,6 +60,14 @@ const MIN_PLAN_HEIGHT = 22;
 const TALL_PLAN_HEIGHT = 96;
 const COLUMN_WIDTHS = [null, 200, 260, 340, 440] as const;
 const COLUMN_WIDTH_STORAGE_KEY = "planner-column-width";
+const THEME_STORAGE_KEY = "planner-theme";
+const THEME_OPTIONS = [
+  { value: "system", label: "System", Icon: Monitor },
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+] as const;
+
+type ThemeMode = (typeof THEME_OPTIONS)[number]["value"];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const MEMBER_COLORS = [
   "#3867F4",
@@ -375,7 +386,21 @@ export default function Home() {
   const [teamUsersError, setTeamUsersError] = useState("");
   const [teamUserSearch, setTeamUserSearch] = useState("");
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    try {
+      const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      return stored === "light" || stored === "dark" ? stored : "system";
+    } catch {
+      return "system";
+    }
+  });
+  const [monthPlanDays, setMonthPlanDays] = useState<{ plan_date: string; category_id: string }[]>([]);
+  const [dataVersion, setDataVersion] = useState(0);
   const currentUserIdRef = useRef<string | null>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+  const liveChannelRef = useRef<RealtimeChannel | null>(null);
+  const liveRefreshRef = useRef<() => void>(() => {});
 
   const visibleDays = useMemo(() => {
     if (view === "day") return [selectedDate];
@@ -470,12 +495,14 @@ export default function Home() {
     };
   }, [fetchStart, rangeEnd, session?.user.id, supabase]);
 
-  async function refreshPlanner(client: SupabaseClient<Database>, currentUserId: string) {
-    setDataLoading(true);
+  // A silent refresh (from live updates) skips the loading indicator and keeps any current message.
+  async function refreshPlanner(client: SupabaseClient<Database>, currentUserId: string, silent = false) {
+    if (!silent) setDataLoading(true);
     const result = await fetchPlannerData(client, currentUserId, fetchStart, rangeEnd);
-    setDataLoading(false);
+    if (!silent) setDataLoading(false);
+    setDataVersion((version) => version + 1);
     if (result.data === null) {
-      setPageError(result.error);
+      if (!silent) setPageError(result.error);
       return;
     }
     setPageError("");
@@ -489,6 +516,104 @@ export default function Home() {
         : null,
     );
     setPlans(result.data.plans);
+  }
+
+  useEffect(() => {
+    liveRefreshRef.current = () => {
+      if (supabase && session?.user.id) void refreshPlanner(supabase, session.user.id, true);
+    };
+  });
+
+  // Live updates: every open planner listens on a shared channel and quietly reloads when a
+  // teammate saves a change. Returning to the tab also reloads, in case a message was missed.
+  useEffect(() => {
+    if (!supabase || !session?.user.id) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleRefresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => liveRefreshRef.current(), 400);
+    };
+    const channel = supabase
+      .channel("planner-updates")
+      .on("broadcast", { event: "changed" }, scheduleRefresh)
+      .subscribe();
+    liveChannelRef.current = channel;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") scheduleRefresh();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      liveChannelRef.current = null;
+      void supabase.removeChannel(channel);
+    };
+  }, [session?.user.id, supabase]);
+
+  function announceChange() {
+    void liveChannelRef.current?.send({ type: "broadcast", event: "changed", payload: {} });
+  }
+
+  const monthGridStart = format(startOfWeek(startOfMonth(selectedDate), { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const monthGridEnd = format(endOfWeek(endOfMonth(selectedDate), { weekStartsOn: 1 }), "yyyy-MM-dd");
+
+  useEffect(() => {
+    if (!supabase || !session?.user.id) return;
+    let mounted = true;
+    void supabase
+      .from("team_plans")
+      .select("plan_date, category_id")
+      .gte("plan_date", monthGridStart)
+      .lte("plan_date", monthGridEnd)
+      .then(({ data }) => {
+        if (mounted && data) setMonthPlanDays(data);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [dataVersion, monthGridEnd, monthGridStart, session?.user.id, supabase]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const applyTheme = () => {
+      const dark = themeMode === "dark" || (themeMode === "system" && media.matches);
+      document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    };
+    applyTheme();
+    if (themeMode !== "system") return;
+    media.addEventListener("change", applyTheme);
+    return () => media.removeEventListener("change", applyTheme);
+  }, [themeMode]);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (userMenuOpen) setUserMenuOpen(false);
+      else if (categoryGuideOpen) setCategoryGuideOpen(false);
+      else if (categoryManagerOpen) setCategoryManagerOpen(false);
+      else if (planDraft) setPlanDraft(null);
+      else setPlanHoverCard(null);
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [categoryGuideOpen, categoryManagerOpen, planDraft, userMenuOpen]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function handlePointerDown(event: PointerEvent) {
+      if (!userMenuRef.current?.contains(event.target as Node)) setUserMenuOpen(false);
+    }
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [userMenuOpen]);
+
+  function changeTheme(mode: ThemeMode) {
+    setThemeMode(mode);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, mode);
+    } catch {
+      // The theme still applies for this visit without storage.
+    }
   }
 
   const loadTeamUsers = useCallback(async () => {
@@ -592,6 +717,7 @@ export default function Home() {
   }
 
   function openNewPlan(startTime = "09:00", planDate = selectedDate, ownerId?: string) {
+    setPageError("");
     const startMinutes = Math.floor(timeToMinutes(startTime) / 30) * 30;
     const start = `${String(Math.floor(startMinutes / 60)).padStart(2, "0")}:${String(startMinutes % 60).padStart(2, "0")}`;
     const endMinutes = Math.min(startMinutes + 60, 23 * 60 + 30);
@@ -611,6 +737,7 @@ export default function Home() {
 
   function openExistingPlan(plan: Plan) {
     setPlanHoverCard(null);
+    setPageError("");
     const canEdit = canManage || plan.created_by === activeProfile?.id;
     setSelectedDate(new Date(`${plan.plan_date}T00:00:00`));
     setPlanDraft({
@@ -689,6 +816,7 @@ export default function Home() {
       return;
     }
     setPlanDraft(null);
+    announceChange();
     await refreshPlanner(supabase, session.user.id);
   }
 
@@ -706,6 +834,7 @@ export default function Home() {
       return;
     }
     setPlanDraft(null);
+    announceChange();
     await refreshPlanner(supabase, session.user.id);
   }
 
@@ -725,6 +854,7 @@ export default function Home() {
     if (error) {
       setPageError(error.message);
     } else {
+      announceChange();
       await refreshPlanner(supabase, session.user.id);
     }
     setCategoryBusy(false);
@@ -755,6 +885,7 @@ export default function Home() {
         next.add(data.id);
         return next;
       });
+      announceChange();
       await refreshPlanner(supabase, session.user.id);
     }
     setCategoryBusy(false);
@@ -911,6 +1042,11 @@ export default function Home() {
       .map((member, index) => [member.id, MEMBER_COLORS[index % MEMBER_COLORS.length]]),
   );
   const visiblePlans = plans.filter((plan) => visibleCategoryIds?.has(plan.category_id) ?? true);
+  const monthPlanDates = new Set(
+    monthPlanDays
+      .filter((plan) => visibleCategoryIds?.has(plan.category_id) ?? true)
+      .map((plan) => plan.plan_date),
+  );
   const selectedDayKey = format(selectedDate, "yyyy-MM-dd");
   const selectedDaySegments = getDaySegments(
     visiblePlans,
@@ -1005,35 +1141,78 @@ export default function Home() {
           >
             <RefreshCw size={17} />
           </button>
-          <div className="user-menu">
-            <span className="user-avatar">{(activeProfile?.display_name || session.user.email || "T").slice(0, 1).toUpperCase()}</span>
-            <span className="user-name">{activeProfile?.display_name || session.user.email}</span>
-            {isPreviewMode ? (
-              <span className="role-pill">BOA preview</span>
-            ) : isAdmin ? (
-              <span className="role-pill">Admin</span>
-            ) : null}
-            <button className="icon-button signout-button" aria-label="Sign out" title="Sign out" onClick={() => void signOut()}><LogOut size={18} /></button>
+          <div className="user-menu" ref={userMenuRef}>
+            <button
+              className={`user-menu-trigger${userMenuOpen ? " open" : ""}`}
+              aria-haspopup="menu"
+              aria-expanded={userMenuOpen}
+              aria-label="Account menu"
+              onClick={() => setUserMenuOpen((open) => !open)}
+            >
+              <span className="user-avatar">{getInitials(activeProfile?.display_name || session.user.email || "T")}</span>
+              <span className="user-name">{activeProfile?.display_name || session.user.email}</span>
+              {isPreviewMode ? (
+                <span className="role-pill preview">BOA preview</span>
+              ) : isAdmin ? (
+                <span className="role-pill">Admin</span>
+              ) : null}
+              <ChevronDown size={15} className="user-menu-chevron" />
+            </button>
+            {userMenuOpen && (
+              <div className="user-menu-panel" role="menu" aria-label="Account">
+                <div className="user-menu-header">
+                  <span className="user-avatar">{getInitials(profile?.display_name || session.user.email || "T")}</span>
+                  <span className="user-menu-identity">
+                    <strong>{profile?.display_name || session.user.email}</strong>
+                    <span>{session.user.email}</span>
+                  </span>
+                </div>
+                {isAdmin && (
+                  <div className="user-menu-section">
+                    <span className="user-menu-label">View planner as</span>
+                    {[{ id: "", display_name: "Admin (you)" }, ...profiles.filter((member) => member.is_test)].map((member) => {
+                      const selected = (isPreviewMode ? testProfile?.id ?? "" : "") === member.id;
+                      return (
+                        <button
+                          className={`user-menu-option${selected ? " selected" : ""}`}
+                          role="menuitemradio"
+                          aria-checked={selected}
+                          key={member.id || "admin"}
+                          onClick={() => {
+                            setTestProfileId(member.id);
+                            setCategoryManagerOpen(false);
+                            setPlanDraft(null);
+                            setUserMenuOpen(false);
+                          }}
+                        >
+                          <span>{member.display_name}</span>
+                          {selected && <Check size={15} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="user-menu-section">
+                  <span className="user-menu-label">Theme</span>
+                  <div className="segmented-control theme-switch" role="group" aria-label="Theme">
+                    {THEME_OPTIONS.map(({ value, label, Icon }) => (
+                      <button
+                        className={themeMode === value ? "selected" : ""}
+                        aria-pressed={themeMode === value}
+                        key={value}
+                        onClick={() => changeTheme(value)}
+                      >
+                        <Icon size={14} /> {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button className="user-menu-option sign-out" role="menuitem" onClick={() => void signOut()}>
+                  <LogOut size={16} /> Sign out
+                </button>
+              </div>
+            )}
           </div>
-          {isAdmin && (
-            <label className="test-preview-control">
-              <span>Preview BOA</span>
-              <select
-                aria-label="Preview the planner as a test BOA member"
-                value={isPreviewMode ? testProfile?.id ?? "" : ""}
-                onChange={(event) => {
-                  setTestProfileId(event.target.value);
-                  setCategoryManagerOpen(false);
-                  setPlanDraft(null);
-                }}
-              >
-                <option value="">Admin view</option>
-                {profiles.filter((member) => member.is_test).map((member) => (
-                  <option key={member.id} value={member.id}>{member.display_name}</option>
-                ))}
-              </select>
-            </label>
-          )}
         </div>
       </header>
 
@@ -1152,15 +1331,19 @@ export default function Home() {
               {eachDayOfInterval({
                 start: startOfWeek(startOfMonth(selectedDate), { weekStartsOn: 1 }),
                 end: endOfWeek(endOfMonth(selectedDate), { weekStartsOn: 1 }),
-              }).map((day) => (
-                <button
-                  key={day.toISOString()}
-                  className={`mini-day${isSameDay(day, selectedDate) ? " selected" : ""}${!isSameMonth(day, selectedDate) ? " muted" : ""}${isSameDay(day, new Date()) ? " today" : ""}${day.getDay() === 0 ? " sunday" : ""}`}
-                  onClick={() => setSelectedDate(day)}
-                >
-                  {format(day, "d")}
-                </button>
-              ))}
+              }).map((day) => {
+                const hasPlans = monthPlanDates.has(format(day, "yyyy-MM-dd"));
+                return (
+                  <button
+                    key={day.toISOString()}
+                    className={`mini-day${isSameDay(day, selectedDate) ? " selected" : ""}${!isSameMonth(day, selectedDate) ? " muted" : ""}${isSameDay(day, new Date()) ? " today" : ""}${day.getDay() === 0 ? " sunday" : ""}${hasPlans ? " has-plans" : ""}`}
+                    aria-label={`${format(day, "EEEE, MMMM d")}${hasPlans ? ", has plans" : ""}`}
+                    onClick={() => setSelectedDate(day)}
+                  >
+                    {format(day, "d")}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <div className="sidebar-section display-section">
@@ -1397,7 +1580,6 @@ export default function Home() {
                                 width: `calc(${plan.width}% - 4px)`,
                                 backgroundColor: `${accentColor}32`,
                                 borderLeftColor: accentColor,
-                                color: "#202124",
                               }}
                               onClick={() => openExistingPlan(plan)}
                               onMouseEnter={(event) => showPlanHoverCard(plan, event.currentTarget)}
@@ -1407,6 +1589,9 @@ export default function Home() {
                               aria-label={`${plan.title}, ${categoryName}, ${ownerName}, ${formatTime(plan.start_time)} to ${formatTime(plan.end_time)}${nextDayNote}`}
                               aria-describedby={planHoverCard?.plan.id === plan.id ? "plan-hover-card" : undefined}
                             >
+                              {(plan.continuesFrom || plan.continuesTo) && (
+                                <span className="plan-overnight-badge" aria-hidden="true"><Moon size={10} strokeWidth={2.4} /></span>
+                              )}
                               <span className="plan-title">{plan.title}</span>
                               <span className="plan-time">{formatTimeRange(plan.start_time, plan.end_time)}<span className="plan-duration"> · {duration}</span></span>
                               <span className="plan-identifiers">
@@ -1631,6 +1816,7 @@ export default function Home() {
                   <textarea value={planDraft.details} onChange={(event) => setPlanDraft({ ...planDraft, details: event.target.value })} maxLength={500} rows={3} placeholder="Add a little more detail" />
                 </label>
               )}
+              {pageError && <p className="dialog-error" role="alert">{pageError}</p>}
               <div className="dialog-actions">
                 {planDraft.id && !planDraft.readOnly && <button className="button button-danger-outline" type="button" onClick={() => void deletePlan()}><Trash2 size={16} /> Delete</button>}
                 <span className="dialog-spacer" />
@@ -1661,6 +1847,7 @@ export default function Home() {
                 To add definitions, run <code>supabase/migrations/202610070005_category_definitions.sql</code> in the Supabase SQL editor.
               </p>
             )}
+            {pageError && <p className="dialog-error" role="alert">{pageError}</p>}
             <div className="admin-category-list">
               {categories.map((category) => (
                 <CategoryEditor
