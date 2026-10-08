@@ -38,6 +38,7 @@ export type Database = {
           color: string;
           active: boolean;
           description: string | null;
+          kind: "working" | "comp_off" | "holiday" | "other";
           created_at: string;
         },
         {
@@ -46,6 +47,7 @@ export type Database = {
           color: string;
           active?: boolean;
           description?: string | null;
+          kind?: "working" | "comp_off" | "holiday" | "other";
           created_at?: string;
         },
         {
@@ -54,6 +56,7 @@ export type Database = {
           color?: string;
           active?: boolean;
           description?: string | null;
+          kind?: "working" | "comp_off" | "holiday" | "other";
           created_at?: string;
         }
       >;

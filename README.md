@@ -73,6 +73,24 @@ To allow plans that cross midnight (for example 11:45 PM to 12:15 AM), apply
 in the Supabase SQL editor. An end time earlier than the start time then means the plan ends on the
 following day.
 
+For the **Team summary** page's comp off counts, apply
+[`supabase/migrations/202610080002_category_kinds.sql`](./supabase/migrations/202610080002_category_kinds.sql)
+in the Supabase SQL editor. It gives each category a type (**Working**, **Comp off**, **Holiday**, or
+**Not counted**) and pre-fills it from common category names; admins can change types in
+**Manage categories**.
+
+## Team summary
+
+`/team-summary` shows every member's comp offs month by month, and every signed-in member can view it.
+
+- **Earned:** each Sunday, or each holiday (a date with a Holiday-type plan), on which the member has a
+  Working-type plan earns 1 comp off.
+- **Taken:** each date with a Comp off-type plan uses 1.
+- **Pending** is everything earned minus everything taken. Comp offs never expire, so unused ones carry
+  into the next month; a negative balance means a comp off was taken before the Sunday or holiday it's for.
+- Overnight plans count on both dates they touch. Test profiles are not included.
+- Select a member to see the dates behind their numbers.
+
 ## Planner behavior
 
 - Day and Monday-to-Sunday week views, with a date picker and previous/next navigation.

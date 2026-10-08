@@ -20,6 +20,7 @@ import {
   CalendarCheck2,
   CalendarDays,
   CalendarPlus,
+  CalendarSync,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -53,7 +54,8 @@ import { usePathname, useRouter } from "next/navigation";
 import type { RealtimeChannel, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabase";
-import type { Category, Plan, PositionedPlan, Profile, TeamUser } from "@/lib/types";
+import type { Category, CategoryKind, Plan, PositionedPlan, Profile, TeamUser } from "@/lib/types";
+import TeamSummaryView from "@/app/team-summary-view";
 
 const HOUR_HEIGHT = 64;
 const MIN_PLAN_HEIGHT = 22;
@@ -68,6 +70,19 @@ const THEME_OPTIONS = [
 ] as const;
 
 type ThemeMode = (typeof THEME_OPTIONS)[number]["value"];
+
+const CATEGORY_KIND_OPTIONS: { value: CategoryKind; label: string }[] = [
+  { value: "working", label: "Working" },
+  { value: "comp_off", label: "Comp off" },
+  { value: "holiday", label: "Holiday" },
+  { value: "other", label: "Not counted" },
+];
+
+const PAGE_LINKS = [
+  { href: "/", label: "Planner", Icon: CalendarCheck2 },
+  { href: "/team", label: "Team", Icon: UsersRound },
+  { href: "/team-summary", label: "Summary", Icon: CalendarSync },
+] as const;
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const MEMBER_COLORS = [
   "#3867F4",
@@ -307,6 +322,7 @@ async function fetchPlannerData(
         profiles: (profilesResult.data ?? []) as Profile[],
         categories: (categoriesResult.data ?? []) as Category[],
         definitionsEnabled: categoriesResult.definitionsEnabled,
+        kindsEnabled: categoriesResult.kindsEnabled,
         plans: (plansResult.data ?? []) as Plan[],
       },
       error: null,
@@ -319,17 +335,34 @@ async function fetchPlannerData(
   }
 }
 
-// Category definitions need the 202610070005 migration; until it runs, load categories without them.
-async function fetchCategories(client: SupabaseClient<Database>) {
-  const result = await client.from("categories").select("id, name, color, active, description").order("name");
-  const missingColumn = result.error?.code === "42703" || /description/i.test(result.error?.message ?? "");
-  if (!missingColumn) return { data: result.data, error: result.error, definitionsEnabled: true };
+function isMissingColumn(error: { code?: string; message?: string } | null) {
+  return error?.code === "42703" || /does not exist/i.test(error?.message ?? "");
+}
 
-  const fallback = await client.from("categories").select("id, name, color, active").order("name");
+// Definitions (202610070005) and types (202610080002) come from migrations; until they run,
+// load categories without those columns so the planner keeps working.
+async function fetchCategories(client: SupabaseClient<Database>) {
+  const full = await client.from("categories").select("id, name, color, active, description, kind").order("name");
+  if (!isMissingColumn(full.error)) {
+    return { data: full.data, error: full.error, definitionsEnabled: true, kindsEnabled: true };
+  }
+
+  const withoutKind = await client.from("categories").select("id, name, color, active, description").order("name");
+  if (!isMissingColumn(withoutKind.error)) {
+    return {
+      data: withoutKind.data?.map((category) => ({ ...category, kind: "other" as const })) ?? null,
+      error: withoutKind.error,
+      definitionsEnabled: true,
+      kindsEnabled: false,
+    };
+  }
+
+  const basic = await client.from("categories").select("id, name, color, active").order("name");
   return {
-    data: fallback.data?.map((category) => ({ ...category, description: null })) ?? null,
-    error: fallback.error,
+    data: basic.data?.map((category) => ({ ...category, description: null, kind: "other" as const })) ?? null,
+    error: basic.error,
     definitionsEnabled: false,
+    kindsEnabled: false,
   };
 }
 
@@ -337,6 +370,8 @@ export default function Home() {
   const pathname = usePathname();
   const router = useRouter();
   const showTeamPage = pathname === "/team";
+  const showSummaryPage = pathname === "/team-summary";
+  const showPlannerPage = !showTeamPage && !showSummaryPage;
   const supabase = useMemo(
     () => (isSupabaseConfigured ? createBrowserSupabaseClient() : null),
     [],
@@ -377,6 +412,8 @@ export default function Home() {
   const [categoryFilterOpen, setCategoryFilterOpen] = useState(false);
   const [categoryGuideOpen, setCategoryGuideOpen] = useState(false);
   const [definitionsEnabled, setDefinitionsEnabled] = useState(true);
+  const [kindsEnabled, setKindsEnabled] = useState(true);
+  const [newCategoryKind, setNewCategoryKind] = useState<CategoryKind>("other");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#4285F4");
   const [newCategoryDescription, setNewCategoryDescription] = useState("");
@@ -483,6 +520,7 @@ export default function Home() {
       setProfiles(result.data.profiles);
       setCategories(result.data.categories);
       setDefinitionsEnabled(result.data.definitionsEnabled);
+      setKindsEnabled(result.data.kindsEnabled);
       setVisibleCategoryIds((current) =>
         current
           ? new Set([...current].filter((id) => result.data.categories.some((category) => category.id === id)))
@@ -510,6 +548,7 @@ export default function Home() {
     setProfiles(result.data.profiles);
     setCategories(result.data.categories);
     setDefinitionsEnabled(result.data.definitionsEnabled);
+      setKindsEnabled(result.data.kindsEnabled);
     setVisibleCategoryIds((current) =>
       current
         ? new Set([...current].filter((id) => result.data.categories.some((category) => category.id === id)))
@@ -849,6 +888,7 @@ export default function Home() {
         color: category.color,
         active: category.active,
         ...(definitionsEnabled ? { description: category.description?.trim() || null } : {}),
+        ...(kindsEnabled ? { kind: category.kind } : {}),
       })
       .eq("id", category.id);
     if (error) {
@@ -872,6 +912,7 @@ export default function Home() {
         color: newCategoryColor,
         active: true,
         ...(definitionsEnabled ? { description: newCategoryDescription.trim() || null } : {}),
+        ...(kindsEnabled ? { kind: newCategoryKind } : {}),
       })
       .select("id")
       .single();
@@ -880,6 +921,7 @@ export default function Home() {
     } else {
       setNewCategoryName("");
       setNewCategoryDescription("");
+      setNewCategoryKind("other");
       setVisibleCategoryIds((current) => {
         const next = new Set(current ?? categories.map(({ id }) => id));
         next.add(data.id);
@@ -1096,14 +1138,14 @@ export default function Home() {
         : `${format(visibleDays[0], "MMM d")} – ${format(visibleDays[6], "MMM d, yyyy")}`;
 
   return (
-    <main className={`planner-app${showTeamPage ? "" : " calendar-mode"}`}>
+    <main className={`planner-app${showPlannerPage ? " calendar-mode" : ""}`}>
       <header className="topbar">
         <Link className="topbar-brand" href="/" aria-label="Team Planner home">
           <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
           <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
         </Link>
         <div className="topbar-controls">
-          {!showTeamPage && (
+          {showPlannerPage && (
             <>
               <button className="button button-outline today-button" onClick={() => setSelectedDate(new Date())}>Today</button>
               <div className="date-arrows">
@@ -1112,18 +1154,28 @@ export default function Home() {
               </div>
             </>
           )}
-          <h1 className="calendar-title">{showTeamPage ? "Team members" : calendarTitle}</h1>
+          <h1 className="calendar-title">{showTeamPage ? "Team members" : showSummaryPage ? "Team summary" : calendarTitle}</h1>
         </div>
         <div className="topbar-actions">
-          <button
-            className={`admin-nav-button${showTeamPage ? " selected" : ""}`}
-            onClick={() => router.push(showTeamPage ? "/" : "/team")}
-            aria-current={showTeamPage ? "page" : undefined}
-          >
-            {showTeamPage ? <CalendarCheck2 size={17} /> : <UsersRound size={17} />}
-            <span>{showTeamPage ? "Planner" : "Team"}</span>
-          </button>
-          {!showTeamPage && (
+          <nav className="page-nav" aria-label="Pages">
+            {PAGE_LINKS.map(({ href, label, Icon }) => {
+              const current = pathname === href;
+              return (
+                <Link
+                  className={`admin-nav-button${current ? " selected" : ""}`}
+                  href={href}
+                  key={href}
+                  aria-current={current ? "page" : undefined}
+                  aria-label={label}
+                  title={label}
+                >
+                  <Icon size={17} />
+                  <span>{label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+          {showPlannerPage && (
             <div className="view-switch" aria-label="Calendar view">
               <button className={view === "day" ? "selected" : ""} onClick={() => setView("day")}>Day</button>
               <button className={view === "week" ? "selected" : ""} onClick={() => setView("week")}>Week</button>
@@ -1216,7 +1268,7 @@ export default function Home() {
         </div>
       </header>
 
-      {!showTeamPage && <div className="mobile-date-bar">
+      {showPlannerPage && <div className="mobile-date-bar">
         <button className="icon-button" aria-label="Previous dates" onClick={() => moveDate(-1)}><ChevronLeft size={20} /></button>
         <strong>{calendarTitle}</strong>
         <button className="mobile-today" onClick={() => setSelectedDate(new Date())}>Today</button>
@@ -1312,6 +1364,21 @@ export default function Home() {
               <span>{canManage ? "Role changes take effect immediately and are enforced by the database." : "Only admins can change team access."}</span>
             </div>
           </section>
+        ) : showSummaryPage ? (
+          supabase && (
+            <TeamSummaryView
+              supabase={supabase}
+              profiles={profiles}
+              categories={categories}
+              kindsEnabled={kindsEnabled}
+              memberColorById={memberColorById}
+              activeProfileId={activeProfile?.id}
+              canManage={canManage}
+              dataVersion={dataVersion}
+              getInitials={getInitials}
+              onManageCategories={openCategoryManager}
+            />
+          )
         ) : (
           <>
         <aside className="sidebar">
@@ -1841,7 +1908,12 @@ export default function Home() {
               </div>
               <button className="icon-button" aria-label="Close dialog" onClick={() => setCategoryManagerOpen(false)}><X size={20} /></button>
             </div>
-            <p className="dialog-date">Choose a color, rename, define, or deactivate a category.</p>
+            <p className="dialog-date">Choose a color, rename, define, set what it counts as, or deactivate a category.</p>
+            {definitionsEnabled && !kindsEnabled && (
+              <p className="category-migration-note">
+                To set category types for the team summary, run <code>supabase/migrations/202610080002_category_kinds.sql</code> in the Supabase SQL editor.
+              </p>
+            )}
             {!definitionsEnabled && (
               <p className="category-migration-note">
                 To add definitions, run <code>supabase/migrations/202610070005_category_definitions.sql</code> in the Supabase SQL editor.
@@ -1855,6 +1927,7 @@ export default function Home() {
                   key={category.id}
                   disabled={categoryBusy}
                   definitionsEnabled={definitionsEnabled}
+                  kindsEnabled={kindsEnabled}
                   onSave={saveCategory}
                 />
               ))}
@@ -1876,6 +1949,14 @@ export default function Home() {
                   rows={2}
                   placeholder="Definition — when should the team use this category?"
                 />
+              )}
+              {kindsEnabled && (
+                <label className="category-kind">
+                  <span>Counts as</span>
+                  <select aria-label="New category type" value={newCategoryKind} onChange={(event) => setNewCategoryKind(event.target.value as CategoryKind)}>
+                    {CATEGORY_KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
               )}
             </form>
           </section>
@@ -1902,6 +1983,9 @@ export default function Home() {
                     <span className="category-dot" style={{ backgroundColor: category.color }} />
                     <span>{category.name}</span>
                     {!category.active && <em>Inactive</em>}
+                    {kindsEnabled && category.kind !== "other" && (
+                      <em className={`kind-${category.kind}`}>{CATEGORY_KIND_OPTIONS.find((option) => option.value === category.kind)?.label}</em>
+                    )}
                   </dt>
                   <dd className={category.description ? "" : "empty"}>
                     {category.description || (canManage ? "No definition yet. Use Edit categories to add one." : "No definition yet.")}
@@ -1930,24 +2014,27 @@ function CategoryEditor({
   category,
   disabled,
   definitionsEnabled,
+  kindsEnabled,
   onSave,
 }: {
   category: Category;
   disabled: boolean;
   definitionsEnabled: boolean;
+  kindsEnabled: boolean;
   onSave: (category: Category) => Promise<void>;
 }) {
   const [name, setName] = useState(category.name);
   const [color, setColor] = useState(category.color);
   const [active, setActive] = useState(category.active);
   const [description, setDescription] = useState(category.description ?? "");
+  const [kind, setKind] = useState<CategoryKind>(category.kind);
 
   return (
     <form
       className={`category-editor${active ? "" : " inactive"}`}
       onSubmit={(event) => {
         event.preventDefault();
-        void onSave({ ...category, name: name.trim(), color, active, description: description.trim() || null });
+        void onSave({ ...category, name: name.trim(), color, active, description: description.trim() || null, kind });
       }}
     >
       <input className="color-picker" aria-label={`${name} color`} type="color" value={color} onChange={(event) => setColor(event.target.value)} />
@@ -1957,6 +2044,14 @@ function CategoryEditor({
         Active
       </label>
       <button className="button button-outline category-save" disabled={disabled || !name.trim()}>Save</button>
+      {kindsEnabled && (
+        <label className="category-kind">
+          <span>Counts as</span>
+          <select aria-label={`${name} type`} value={kind} onChange={(event) => setKind(event.target.value as CategoryKind)}>
+            {CATEGORY_KIND_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+      )}
       {definitionsEnabled && (
         <textarea
           className="category-description-input"

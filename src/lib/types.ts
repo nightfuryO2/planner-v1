@@ -20,7 +20,10 @@ export type Category = {
   color: string;
   active: boolean;
   description: string | null;
+  kind: CategoryKind;
 };
+
+export type CategoryKind = "working" | "comp_off" | "holiday" | "other";
 
 export type Plan = {
   id: string;
