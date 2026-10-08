@@ -1096,7 +1096,7 @@ export default function Home() {
         : `${format(visibleDays[0], "MMM d")} – ${format(visibleDays[6], "MMM d, yyyy")}`;
 
   return (
-    <main className="planner-app">
+    <main className={`planner-app${showTeamPage ? "" : " calendar-mode"}`}>
       <header className="topbar">
         <Link className="topbar-brand" href="/" aria-label="Team Planner home">
           <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>

@@ -3591,6 +3591,60 @@ textarea:focus-visible {
   }
 }
 
+/* The planner fills the window and the page itself never scrolls. The calendar scrolls its
+   hours and the sidebar scrolls on its own, side by side, so one scroll gesture never has to
+   hand off between nested scroll areas. */
+.planner-app.calendar-mode {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.planner-app.calendar-mode .topbar,
+.planner-app.calendar-mode .mobile-date-bar {
+  flex: 0 0 auto;
+}
+
+.planner-app.calendar-mode .planner-body {
+  min-height: 0;
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.planner-app.calendar-mode .sidebar {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.planner-app.calendar-mode .calendar-panel {
+  min-height: 0;
+}
+
+.planner-app.calendar-mode .calendar-scroll {
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 760px) {
+  .planner-app.calendar-mode .planner-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .planner-app.calendar-mode .sidebar {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .planner-app.calendar-mode .calendar-panel {
+    height: auto;
+    flex: 1;
+  }
+}
+
 /* Dark theme */
 :root[data-theme="dark"] {
   color-scheme: dark;
