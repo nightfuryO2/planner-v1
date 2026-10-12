@@ -2446,6 +2446,38 @@ textarea:focus-visible {
   margin-top: 4px;
 }
 
+.auth-google {
+  width: 100%;
+  min-height: 46px;
+  gap: 10px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: #80868b;
+  font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #dadce0;
+}
+
+:root[data-theme="dark"] .auth-divider {
+  color: #9aa6ba;
+}
+
+:root[data-theme="dark"] .auth-divider::before,
+:root[data-theme="dark"] .auth-divider::after {
+  background: #2e3a50;
+}
+
 .auth-switch {
   margin: 22px 0 0;
   color: #5f6368;
