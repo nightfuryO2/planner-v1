@@ -1015,26 +1015,14 @@ export default function Home() {
   if (!session) {
     return (
       <main className="auth-screen">
-        <section className="auth-aside">
-          <Link className="brand brand-light" href="/" aria-label="Team Planner home">
-            <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
-            <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
-          </Link>
-          <div className="auth-pitch">
-            <span className="eyebrow">A clearer day, together</span>
-            <h1>Make time for<br />what matters.</h1>
-            <p>See the shape of your team&apos;s day and make every plan easy to find.</p>
-            <div className="preview-week" aria-hidden="true">
-              <div className="preview-day"><span>MON</span><b>12</b><i className="preview-block blue" /><i className="preview-block green" /></div>
-              <div className="preview-day active"><span>TUE</span><b>13</b><i className="preview-block purple" /><i className="preview-block amber" /><i className="preview-block blue" /></div>
-              <div className="preview-day"><span>WED</span><b>14</b><i className="preview-block rose" /><i className="preview-block green" /></div>
-            </div>
-          </div>
-          <span className="auth-footer">A shared view of the day, built for your team.</span>
-        </section>
+        <div className="auth-backdrop" aria-hidden="true">
+          <span className="auth-orb auth-orb-one" />
+          <span className="auth-orb auth-orb-two" />
+          <span className="auth-orb auth-orb-three" />
+        </div>
         <section className="auth-main">
           <div className="auth-card">
-            <Link className="brand auth-mobile-brand" href="/" aria-label="Team Planner home">
+            <Link className="brand auth-brand" href="/" aria-label="Team Planner home">
               <span className="brand-mark"><CalendarCheck2 size={21} strokeWidth={2.1} /></span>
               <span className="brand-name"><span>Team</span> <strong>Planner</strong></span>
             </Link>
